@@ -1,0 +1,93 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+
+
+#include "sampling.h"
+
+layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
+layout(binding = 1, r32f, set = 0) uniform image2D image;
+layout(binding = 2, set = 0) uniform sampler2D samplers[3];
+
+layout(location = 0) rayPayloadNV bool isHit;
+
+layout(push_constant) uniform Constants
+{
+  int   rtao_samples;
+  float rtao_radius;
+  float rtao_power;
+  int   frame_number;
+};
+
+
+//////////////////////////// AO //////////////////////////////////////
+#define EPS 0.05
+const float PI = 3.141592653589;
+
+void compute_default_basis(const vec3 normal, out vec3 x, out vec3 y, out vec3 z)
+{
+  // ZAP's default coordinate system for compatibility
+  z              = normal;
+  const float yz = -z.y * z.z;
+  y = normalize(((abs(z.z) > 0.99999f) ? vec3(-z.x * z.y, 1.0f - z.y * z.y, yz) : vec3(-z.x * z.z, yz, 1.0f - z.z * z.z)));
+
+  x = cross(y, z);
+}
+
+void main()
+{
+  // Lookup Gbuffer data
+  vec3 pos    = texelFetch(samplers[0], ivec2(gl_LaunchIDNV.xy), 0).xyz;
+  vec3 normal = texelFetch(samplers[1], ivec2(gl_LaunchIDNV.xy), 0).xyz;
+
+  // Early out if this pixel didn't hit the scene
+  if(normal == vec3(0))
+  {
+    imageStore(image, ivec2(gl_LaunchIDNV.xy), vec4(0.0));
+    return;
+  }
+
+  uint index = gl_LaunchIDNV.x + gl_LaunchIDNV.y * gl_LaunchSizeNV.x;
+
+  // Move origin slightly away from the surface to avoid self-occlusion
+  const vec3 origin = pos + normalize(normal) * 0.01f;
+
+  vec3  x, y, z;
+  float occlusion = 0.0;
+  compute_default_basis(normal, x, y, z);
+
+  uint  seed = tea(gl_LaunchIDNV.y * gl_LaunchSizeNV.x + gl_LaunchIDNV.x, frame_number);
+
+  for(float i = 0; i < rtao_samples; i++)
+  {
+
+    float r1 = radinv2(seed);
+    float r2 = radinv_fl(seed, 3);
+    float sq = sqrt(1.0 - r2);
+
+    vec3 direction = vec3(cos(2 * PI * r1) * sq, sin(2 * PI * r1) * sq, sqrt(r2));
+    direction      = direction.x * x + direction.y * y + direction.z * z;
+    seed++;
+    isHit = true;
+    traceNV(topLevelAS, gl_RayFlagsOpaqueNV | gl_RayFlagsTerminateOnFirstHitNV | gl_RayFlagsSkipClosestHitShaderNV,
+            0xFF, 0, 0, 0, origin, EPS, direction, rtao_radius, 0);
+
+    occlusion += isHit ? 1.0 : 0.0;
+  }
+
+  occlusion = 1 - (occlusion / rtao_samples);
+  occlusion = pow(clamp(occlusion, 0, 1), rtao_power);
+
+
+  // Do accumulation
+  if(frame_number > 0)
+  {
+    float a         = 1.0f / float(frame_number);
+    vec3  old_color = imageLoad(image, ivec2(gl_LaunchIDNV.xy)).xyz;
+    imageStore(image, ivec2(gl_LaunchIDNV.xy), vec4(mix(old_color, vec3(occlusion), a), 1.f));
+  }
+  else
+  {
+    imageStore(image, ivec2(gl_LaunchIDNV.xy), vec4(occlusion, occlusion, occlusion, 0.0));
+  }
+}
