@@ -44,6 +44,7 @@
 
 #include "vkglexample.h"
 
+#include "imgui_impl_glfw.h"
 #include <nvvk/extensions_vk.hpp>
 
 
@@ -491,8 +492,7 @@ void VkGlExample::createShaders()
 //
 void VkGlExample::drawUI()
 {
-  auto& imgui_io       = ImGui::GetIO();
-  imgui_io.DisplaySize = ImVec2(m_size.width, m_size.height);
+  ImGui_ImplGlfw_NewFrame();
 
   bool modified = false;
   ImGui::NewFrame();
@@ -611,16 +611,18 @@ void VkGlExample::createGBuffers()
 //--------------------------------------------------------------------------------------------------
 // Catch for SPACE and F
 //
-void VkGlExample::onKeyboardChar(unsigned char key, int mods, int x, int y)
+void VkGlExample::onKeyboardChar(unsigned char key)
 {
-  nvvkpp::AppBase::onKeyboardChar(key, mods, x, y);
-  if(ImGuiH::key_char(key))
+  nvvkpp::AppBase::onKeyboardChar(key);
+  if(ImGui::GetIO().WantCaptureKeyboard)
   {
     return;
   }
 
   if(key == ' ' || key == 'i' || key == 'I')
   {
+    double x, y;
+    glfwGetCursorPos(m_window, &x, &y);
     nvmath::vec4f pixelf;
     glGetTextureSubImage(m_gBufferColor[0].oglId, 0, x, m_size.height - y, 0, 1, 1, 1, GL_RGBA, GL_FLOAT,
                          sizeof(nvmath::vec4f), &pixelf);
@@ -639,11 +641,11 @@ void VkGlExample::onKeyboardChar(unsigned char key, int mods, int x, int y)
 //--------------------------------------------------------------------------------------------------
 // Catch for home 'reset camera'
 //
-void VkGlExample::onKeyboard(NVPWindow::KeyCode key, ButtonAction action, int mods, int x, int y)
+void VkGlExample::onKeyboard(int key, int scancode, int action, int mods)
 {
-  nvvkpp::AppBase::onKeyboard(key, action, mods, x, y);
+  nvvkpp::AppBase::onKeyboard(key, scancode, action, mods);
 
-  if(key == NVPWindow::KEY_HOME)
+  if(key == GLFW_KEY_HOME)
   {
     CameraManip.setLookat({10, 10, 10}, {0, 0, 0}, {0, 1, 0}, false);
   }

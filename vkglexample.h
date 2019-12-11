@@ -27,19 +27,16 @@
 
 
 #include <array>
-
-#include <nvgl/extensions_gl.hpp>
-
-#include <nvmath/nvmath.h>
 #include <vulkan/vulkan.hpp>
-
-#include "utility_ogl.hpp"
-#include <nvvkpp/appbase_vkpp.hpp>
 
 #include "gl_vkpp.hpp"
 #include "imgui_impl_gl.h"
+#include "nvgl/extensions_gl.hpp"
+#include "nvmath/nvmath.h"
 #include "nvvk/allocator_dma_vkgl.hpp"
+#include "nvvkpp/appbase_vkpp.hpp"
 #include "raytrace_interop.hpp"
+#include "utility_ogl.hpp"
 
 //--------------------------------------------------------------------------------------------------
 // Simple example showing some objects, simple material and lighting, camera movement
@@ -98,12 +95,11 @@ public:
   bool needToResetFrame();
   void drawUI();
 
-  void onWindowRefresh() override;
+  void onWindowRefresh();
   void destroy() override;
   void onResize(int w, int h) override;
-  void onKeyboardChar(unsigned char, int mods, int x, int y) override;
-  void onKeyboard(NVPWindow::KeyCode key, ButtonAction action, int mods, int x, int y) override;
-
+  void onKeyboardChar(unsigned char) override;
+  void onKeyboard(int key, int scancode, int action, int mods) override;
   void loadImage(const std::string& filename);
   void createShaders();
 
@@ -116,7 +112,7 @@ public:
     onWindowResize(width, height);
 
     // UI
-    ImGuiH::Init(width, height, this);
+    ImGui::CreateContext();
     ImGui::InitGL();
     ImGui::GetIO().IniFilename = nullptr;  // Avoiding the INI file
   }

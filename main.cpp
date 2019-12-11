@@ -37,15 +37,20 @@
 #include <aclapi.h>
 #include <array>
 #include <chrono>
+#include <vulkan/vulkan.hpp>
 
-#include "vkglexample.h"
-#include <nvgl/contextwindow_gl.hpp>
-#include <nvgl/extensions_gl.hpp>
-#include <nvvkpp/context_vkpp.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
+
+#include "fileformats/stb_image.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "nvgl/contextwindow_gl.hpp"
+#include "nvgl/extensions_gl.hpp"
+#include "nvpsystem.hpp"
 #include "nvvk/extensions_vk.hpp"
-#include <fileformats/stb_image.h>
+#include "nvvkpp/context_vkpp.hpp"
+#include "vkglexample.h"
 
 int const SAMPLE_SIZE_WIDTH  = 1200;
 int const SAMPLE_SIZE_HEIGHT = 900;
@@ -65,25 +70,17 @@ std::vector<std::string> defaultSearchPaths{
 //
 int main(int argc, char** argv)
 {
-
-  // -------------------------------
-  // Basic OpenGL settings
-  //
-  nvgl::ContextWindowCreateInfo context(4,       //major;
-                                        5,       //minor;
-                                        false,   //core;
-                                        1,       //MSAA;
-                                        24,      //depth bits
-                                        8,       //stencil bits
-                                        false,   //debug;
-                                        false,   //robust;
-                                        false,   //forward;
-                                        false,   //stereo;
-                                        nullptr  //share;
-  );
-
   // setup some basic things for the sample, logging file for example
   NVPSystem system(argv[0], PROJECT_NAME);
+
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+  // Create window with graphics context
+  GLFWwindow* window = glfwCreateWindow(SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT, PROJECT_NAME, NULL, NULL);
+  if(window == nullptr)
+    return 1;
+  glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);  // Enable vsync
 
   nvvkpp::ContextCreateInfo deviceInfo;
   deviceInfo.addInstanceExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -112,13 +109,13 @@ int main(int argc, char** argv)
   VkGlExample         example;
   nvgl::ContextWindow contextWindowGL;
 
-  // Creating the window
-  example.open(0, 0, SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT, PROJECT_NAME);
+  //// Creating the window
+  //example.open(0, 0, SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT, PROJECT_NAME);
 
-  // OpenGL context within the Window
-  contextWindowGL.init(&context, example.m_internal, PROJECT_NAME);
-  contextWindowGL.makeContextCurrent();
-  contextWindowGL.swapInterval(0);
+  //// OpenGL context within the Window
+  //contextWindowGL.init(&context, example.m_internal, PROJECT_NAME);
+  //contextWindowGL.makeContextCurrent();
+  //contextWindowGL.swapInterval(0);
 
   // Loading all OpenGL symbols
   load_GL(nvgl::ContextWindow::sysGetProcAddress);
@@ -135,26 +132,36 @@ int main(int argc, char** argv)
   // Various ways of creating vertex buffers
   example.initExample();
 
-  // Window system loop
-  while(example.pollEvents() && !example.isClosing())
+  // GLFW Callback
+  example.setupGlfwCallbacks(window);
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+
+  // Main loop
+  while(!glfwWindowShouldClose(window))
   {
-    if(example.isOpen())
-    {
-      CameraManip.updateAnim();
-      glClearColor(0.5f, 0.0f, 0.0f, 0.0f);
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      glEnable(GL_DEPTH_TEST);
+    glfwPollEvents();
+    if(example.isMinimized())
+      continue;
 
-      auto& imgui_io       = ImGui::GetIO();
-      imgui_io.DisplaySize = ImVec2(SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT);
+    CameraManip.updateAnim();
+    glClearColor(0.5f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
 
-      example.onWindowRefresh();
-      example.drawUI();
+    auto& imgui_io       = ImGui::GetIO();
+    imgui_io.DisplaySize = ImVec2(SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT);
 
-      contextWindowGL.swapBuffers();
-    }
+    example.onWindowRefresh();
+    example.drawUI();
+
+    glfwSwapBuffers(window);
   }
 
   example.destroy();
   vkctx.deinit();
+
+  glfwDestroyWindow(window);
+  glfwTerminate();
+
+  return 0;
 }
