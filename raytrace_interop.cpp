@@ -188,10 +188,10 @@ void nvvkpp::RtInterop::createPipeline()
 
   // Raygen
   stages.push_back({{}, vk::ShaderStageFlagBits::eRaygenNV, raygenSM, "main"});
-  groups.emplace_back(vk::RayTracingShaderGroupTypeNV::eGeneral, 0);
+  groups.emplace_back(vk::RayTracingShaderGroupTypeNV::eGeneral, 0, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV);
   // Miss
   stages.push_back({{}, vk::ShaderStageFlagBits::eMissNV, missSM, "main"});
-  groups.emplace_back(vk::RayTracingShaderGroupTypeNV::eGeneral, 1);
+  groups.emplace_back(vk::RayTracingShaderGroupTypeNV::eGeneral, 1, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV);
   // Hit (empty - not needed)
 
   vk::PushConstantRange        pushConstant{vk::ShaderStageFlagBits::eRaygenNV, 0, sizeof(PushConstant)};
