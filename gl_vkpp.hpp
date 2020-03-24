@@ -31,7 +31,9 @@
 
 #include "nvvk/memorymanagement_vkgl.hpp"
 #include "nvvkpp/allocator_dma_vkpp.hpp"
+#ifdef WIN32
 #include <handleapi.h>
+#endif
 #include <nvgl/extensions_gl.hpp>
 
 

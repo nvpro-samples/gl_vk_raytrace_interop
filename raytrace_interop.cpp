@@ -244,12 +244,21 @@ void nvvkpp::RtInterop::createShadingBindingTable()
 //
 void nvvkpp::RtInterop::createSemaphores()
 {
+#ifdef WIN32
   HANDLE glReadyHandle{INVALID_HANDLE_VALUE};
   HANDLE glCompleteHandle{INVALID_HANDLE_VALUE};
+#else
+  int glReadyHandle{-1};
+  int glCompleteHandle{-1};
+#endif
 
   // Vulkan
   {
+#ifdef WIN32
     auto handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueWin32;
+#else
+    auto handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd;
+#endif
     {
       vk::SemaphoreCreateInfo       sci;
       vk::ExportSemaphoreCreateInfo esci;
@@ -258,8 +267,13 @@ void nvvkpp::RtInterop::createSemaphores()
       m_semaphores.vkReady    = m_device.createSemaphore(sci);
       m_semaphores.vkComplete = m_device.createSemaphore(sci);
     }
+#ifdef WIN32
     glReadyHandle    = m_device.getSemaphoreWin32HandleKHR({m_semaphores.vkReady, handleType});
     glCompleteHandle = m_device.getSemaphoreWin32HandleKHR({m_semaphores.vkComplete, handleType});
+#else
+    glReadyHandle    = m_device.getSemaphoreFdKHR({m_semaphores.vkReady, handleType});
+    glCompleteHandle = m_device.getSemaphoreFdKHR({m_semaphores.vkComplete, handleType});
+#endif
   }
 
   // OpenGL
@@ -267,8 +281,13 @@ void nvvkpp::RtInterop::createSemaphores()
     // Import semaphores
     glGenSemaphoresEXT(1, &m_semaphores.glReady);
     glGenSemaphoresEXT(1, &m_semaphores.glComplete);
+#ifdef WIN32
     glImportSemaphoreWin32HandleEXT(m_semaphores.glReady, GL_HANDLE_TYPE_OPAQUE_WIN32_EXT, glReadyHandle);
     glImportSemaphoreWin32HandleEXT(m_semaphores.glComplete, GL_HANDLE_TYPE_OPAQUE_WIN32_EXT, glCompleteHandle);
+#else
+    glImportSemaphoreFdEXT(m_semaphores.glReady, GL_HANDLE_TYPE_OPAQUE_FD_EXT, glReadyHandle);
+    glImportSemaphoreFdEXT(m_semaphores.glComplete, GL_HANDLE_TYPE_OPAQUE_FD_EXT, glCompleteHandle);
+#endif
   }
 }
 

@@ -35,7 +35,9 @@
 // - By default, the rendering is done in multi-sampling and resolve in the back buffer
 
 
+#ifdef WIN32
 #include <concrt.h>
+#endif
 #include <iostream>
 #include <random>  // Used to randomly place objects
 #include <sstream>
