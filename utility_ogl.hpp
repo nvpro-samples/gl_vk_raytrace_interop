@@ -96,7 +96,7 @@ public:
     glCompileShader(fragment);
     checkCompileErrors(fragment, "FRAGMENT");
     // if geometry shader is given, compile geometry shader
-    unsigned int geometry;
+    unsigned int geometry{0};
     if(!geometryPath.empty())
     {
       const char* gShaderCode = geometryCode.c_str();
