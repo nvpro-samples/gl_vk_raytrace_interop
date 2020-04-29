@@ -34,18 +34,15 @@
 #include "nvgl/extensions_gl.hpp"
 #include "nvmath/nvmath.h"
 #include "nvvk/allocator_dma_vkgl.hpp"
-#include "nvvkpp/appbase_vkpp.hpp"
+#include "nvvk/appbase_vkpp.hpp"
 #include "raytrace_interop.hpp"
 #include "utility_ogl.hpp"
 
 //--------------------------------------------------------------------------------------------------
 // Simple example showing some objects, simple material and lighting, camera movement
 //
-class VkGlExample : public nvvkpp::AppBase
+class VkGlExample : public nvvk::AppBase
 {
-  using nvvkBuffer  = nvvkpp::BufferVkGL;
-  using nvvkTexture = nvvkpp::Texture2DVkGL;
-
 public:
   // Structure of the Vertices used by the shaders
   struct Vertex
@@ -58,14 +55,14 @@ public:
   // Simple triangle mesh structure
   struct Meshes
   {
-    nvvkBuffer     vertices;
-    nvvkBuffer     indices;
-    uint32_t       indexCount{0};   // Nb of indices to draw
-    uint32_t       vertexCount{0};  // Nb vertices
-    GLuint         oglID{0};        // OpenGL
-    vk::GeometryNV rayGeometry;     // Raytrace
+    interop::BufferVkGL vertices;
+    interop::BufferVkGL indices;
+    uint32_t            indexCount{0};   // Nb of indices to draw
+    uint32_t            vertexCount{0};  // Nb vertices
+    GLuint              oglID{0};        // OpenGL
+    vk::GeometryNV      rayGeometry;     // Raytrace
 
-    void destroy(nvvkpp::AllocatorDma& alloc)
+    void destroy(nvvk::AllocatorDma& alloc)
     {
       vertices.destroy(alloc);
       indices.destroy(alloc);
@@ -82,11 +79,11 @@ public:
 
   VkGlExample() = default;
 
-  void setup(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t graphicsQueueIndex) override
+  void setup(const vk::Instance& instance, const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t graphicsQueueIndex) override
   {
-    AppBase::setup(device, physicalDevice, graphicsQueueIndex);
+    AppBase::setup(instance, device, physicalDevice, graphicsQueueIndex);
     m_dmaAllocGL.init(device, physicalDevice);
-    m_alloc.init(device, &m_dmaAllocGL);
+    m_alloc.init(device, physicalDevice, &m_dmaAllocGL);
 
     m_ray.setup(device, physicalDevice, graphicsQueueIndex);
   }
@@ -142,7 +139,7 @@ private:
   // The buffers used by the example
   struct
   {
-    nvvkBuffer matrices;  // matrices of all instances
+    interop::BufferVkGL matrices;  // matrices of all instances
   } m_uniformBuffers;
 
   void createScene();
@@ -155,15 +152,15 @@ private:
   Meshes createPlane();
   Meshes createFacetedTetrahedron();
 
-  nvvkTexture              m_imageVkGL;
-  std::vector<nvvkTexture> m_gBufferColor{{}, {}, {}};  // Position, Normal, Albedo
+  interop::Texture2DVkGL              m_imageVkGL;
+  std::vector<interop::Texture2DVkGL> m_gBufferColor{{}, {}, {}};  // Position, Normal, Albedo
 
   GLuint m_gFramebuffer = 0;
   Shader m_shaderRaster;
   Shader m_shaderComposite;
 
-  nvvkpp::AllocatorDma          m_alloc;  // The Vulkan buffer and image allocator with Export
+  nvvk::AllocatorDma            m_alloc;  // The Vulkan buffer and image allocator with Export
   nvvk::DeviceMemoryAllocatorGL m_dmaAllocGL;
 
-  nvvkpp::RtInterop m_ray;
+  interop::RtInterop m_ray;
 };

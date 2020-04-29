@@ -29,8 +29,8 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "nvvk/allocator_dma_vk.hpp"
 #include "nvvk/memorymanagement_vkgl.hpp"
-#include "nvvkpp/allocator_dma_vkpp.hpp"
 #ifdef WIN32
 #include <handleapi.h>
 #endif
@@ -43,16 +43,16 @@
 //
 
 
-namespace nvvkpp {
+namespace interop {
 
 // #VKGL Extra for Interop
 struct BufferVkGL
 {
-  nvvkpp::BufferDma bufVk;  // The allocated buffer
+  nvvk::BufferDma bufVk;  // The allocated buffer
 
   GLuint oglId = 0;  // Extra: OpenGL object ID
 
-  void destroy(nvvkpp::AllocatorDma& alloc)
+  void destroy(nvvk::AllocatorDma& alloc)
   {
     alloc.destroy(bufVk);
     glDeleteBuffers(1, &oglId);
@@ -62,13 +62,13 @@ struct BufferVkGL
 // #VKGL Extra for Interop
 struct Texture2DVkGL
 {
-  nvvkpp::TextureDma texVk;
+  nvvk::TextureDma texVk;
 
   GLuint       oglId{0};  // Extra: OpenGL object ID
   uint32_t     mipLevels{1};
   vk::Extent2D imgSize{0, 0};
 
-  void destroy(nvvkpp::AllocatorDma& alloc)
+  void destroy(nvvk::AllocatorDma& alloc)
   {
     alloc.destroy(texVk);
     glDeleteBuffers(1, &oglId);

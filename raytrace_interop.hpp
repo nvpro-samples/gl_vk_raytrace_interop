@@ -31,24 +31,22 @@
 // Raytracing implementation for the Vulkan Interop (G-Buffers)
 //////////////////////////////////////////////////////////////////////////
 
-#define ALLOC_DMA
+#define NVVK_ALLOC_DMA
 #include "nvmath/nvmath.h"
 
 #include "gl_vkpp.hpp"
 #include "nvh/fileoperations.hpp"
-#include "nvvkpp/raytrace_vkpp.hpp"
+#include "nvvk/raytraceNV_vk.hpp"
 
 
-namespace nvvkpp {
+namespace interop {
 
 struct RtInterop
 {
-  using nvvkTexture = nvvkpp::Texture2DVkGL;
-  using nvvkBuffer  = nvvkpp::BufferDma;
-  using vkDT        = vk::DescriptorType;
-  using vkSS        = vk::ShaderStageFlagBits;
-  using vkCB        = vk::CommandBufferUsageFlagBits;
-  using vkDSLB      = vk::DescriptorSetLayoutBinding;
+  using vkDT   = vk::DescriptorType;
+  using vkSS   = vk::ShaderStageFlagBits;
+  using vkCB   = vk::CommandBufferUsageFlagBits;
+  using vkDSLB = vk::DescriptorSetLayoutBinding;
 
   // Information push at each call
   struct PushConstant
@@ -72,16 +70,16 @@ struct RtInterop
   RtInterop() = default;
 
   // Accessors
-  const Semaphore&             semaphores() const { return m_semaphores; }
-  const nvvkpp::Texture2DVkGL& outputImage() const { return m_rtOutputGL; }
-  nvvkpp::RaytracingBuilder&   builder() { return m_rtBuilder; }
+  const Semaphore&              semaphores() const { return m_semaphores; }
+  const interop::Texture2DVkGL& outputImage() const { return m_rtOutputGL; }
+  nvvk::RaytracingBuilderNV&    builder() { return m_rtBuilder; }
 
   //
   void setup(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t queueIndex);
   void destroy();
   void createOutputImage(vk::Extent2D size);
-  void createDescriptorSet(const std::vector<nvvkpp::Texture2DVkGL>& gBuffers);
-  void updateDescriptorSet(const std::vector<nvvkpp::Texture2DVkGL>& gBuffers);
+  void createDescriptorSet(const std::vector<interop::Texture2DVkGL>& gBuffers);
+  void updateDescriptorSet(const std::vector<interop::Texture2DVkGL>& gBuffers);
   void createPipeline();
   void createShadingBindingTable();
   void createSemaphores();
@@ -92,20 +90,19 @@ private:
   // Allocator and memory manager
   nvvk::DeviceMemoryAllocatorGL m_dmaAllocGL;  // Allocator for the result image
   nvvk::DeviceMemoryAllocator   m_dmaAlloc;    // Allocator for the ray tracer
-  nvvkpp::AllocatorDma          m_allocGL;
-  nvvkpp::AllocatorDma          m_alloc;
-
+  nvvk::AllocatorDma            m_allocGL;
+  nvvk::AllocatorDma            m_alloc;
   //
   vk::Device m_device;
   uint32_t   m_queueIndex;
 
   // Ray tracing specific
-  nvvkTexture               m_rtOutputGL;
+  interop::Texture2DVkGL    m_rtOutputGL;
   vk::CommandPool           m_rtCmdPool;
   vk::CommandBuffer         m_rtCmdBuffer;  // CmdBuf use for ray tracing
   vk::Queue                 m_rtQueue;
-  nvvkBuffer                m_rtSBTBuffer;
-  nvvkpp::RaytracingBuilder m_rtBuilder;
+  nvvk::BufferDma           m_rtSBTBuffer;
+  nvvk::RaytracingBuilderNV m_rtBuilder;
   vk::DescriptorPool        m_rtDescPool;
   vk::DescriptorSetLayout   m_rtDescSetLayout;
   vk::DescriptorSet         m_rtDescSet;
@@ -115,4 +112,4 @@ private:
   // Properties
   vk::PhysicalDeviceRayTracingPropertiesNV m_rtProperties;
 };
-}  // namespace nvvkpp
+}  // namespace interop

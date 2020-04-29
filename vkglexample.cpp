@@ -77,7 +77,7 @@ void VkGlExample::initExample()
 
   // Raytracing
   {
-    std::vector<std::vector<vk::GeometryNV>> blass;
+    std::vector<std::vector<VkGeometryNV>> blass;
     blass.reserve(m_meshes.size());
     for(auto& m : m_meshes)  // Two meshes: plane and tetrahedron
     {
@@ -85,7 +85,7 @@ void VkGlExample::initExample()
     }
 
     // One instance has the plane objectID, all others the tetrahedron with a different transform
-    std::vector<nvvkpp::RaytracingBuilder::Instance> rayInst(m_instances.size());
+    std::vector<nvvk::RaytracingBuilderNV::Instance> rayInst(m_instances.size());
     for(size_t i = 0; i < m_instances.size(); i++)
     {
       rayInst[i].instanceId = uint32_t(i);
@@ -122,6 +122,7 @@ void VkGlExample::destroy()
 
   m_uniformBuffers.matrices.destroy(m_alloc);
   m_ray.destroy();
+  m_alloc.deinit();
   m_dmaAllocGL.deinit();
   AppBase::destroy();
 }
@@ -210,12 +211,12 @@ VkGlExample::Meshes VkGlExample::createFacetedTetrahedron()
   mesh.vertexCount = (uint32_t)vert.size();
 
   {
-    nvvkpp::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
+    nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
     mesh.vertices.bufVk = m_alloc.createBuffer<Vertex>(cmdBuf, vert, vk::BufferUsageFlagBits::eVertexBuffer);
     mesh.indices.bufVk  = m_alloc.createBuffer<uint32_t>(cmdBuf, indices, vk::BufferUsageFlagBits::eIndexBuffer);
     vulkanMeshToOpenGL(mesh);
   }
-  m_alloc.flushStaging();
+  m_alloc.finalizeAndReleaseStaging();
 
   return mesh;
 }
@@ -253,11 +254,11 @@ VkGlExample::Meshes VkGlExample::createPlane()
   mesh.indexCount  = (uint32_t)indices.size();
   mesh.vertexCount = (uint32_t)vert.size();
   {
-    nvvkpp::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
+    nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
     mesh.vertices.bufVk = m_alloc.createBuffer<Vertex>(cmdBuf, vert, vk::BufferUsageFlagBits::eVertexBuffer);
     mesh.indices.bufVk  = m_alloc.createBuffer<uint32_t>(cmdBuf, indices, vk::BufferUsageFlagBits::eIndexBuffer);
   }
-  m_alloc.flushStaging();
+  m_alloc.finalizeAndReleaseStaging();
 
   vulkanMeshToOpenGL(mesh);
   return mesh;
@@ -329,12 +330,12 @@ void VkGlExample::prepareUniformBuffers()
   }
 
   {
-    nvvkpp::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
+    nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
     m_uniformBuffers.matrices.bufVk =
         m_alloc.createBuffer<nvmath::mat4f>(cmdBuf, allMatrices, vk::BufferUsageFlagBits::eStorageBuffer);
     createBufferGL(m_uniformBuffers.matrices, m_dmaAllocGL);
   }
-  m_alloc.flushStaging();
+  m_alloc.finalizeAndReleaseStaging();
 }
 
 //--------------------------------------------------------------------------------
@@ -461,17 +462,19 @@ void VkGlExample::loadImage(const std::string& filename)
   size_t         dataSize  = w * h * 4;
 
   auto imgSize = vk::Extent2D(w, h);
-  auto imgInfo = nvvkpp::image::create2DInfo(imgSize, vk::Format::eR8G8B8A8Unorm, vk::ImageUsageFlagBits::eSampled, true);
+  auto imgInfo = nvvk::makeImage2DCreateInfo(imgSize, vk::Format::eR8G8B8A8Unorm, vk::ImageUsageFlagBits::eSampled, true);
 
   {
-    nvvkpp::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
-    m_imageVkGL.texVk = m_alloc.createImage(cmdBuf, dataSize, dataImage, imgInfo, vk::ImageLayout::eShaderReadOnlyOptimal);
-    nvvkpp::image::generateMipmaps(cmdBuf, m_imageVkGL.texVk.image, vk::Format::eR8G8B8A8Unorm, imgSize, imgInfo.mipLevels);
+    nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
+    nvvk::ImageDma image = m_alloc.createImage(cmdBuf, dataSize, dataImage, imgInfo, vk::ImageLayout::eShaderReadOnlyOptimal);
+    nvvk::cmdGenerateMipmaps(cmdBuf, image.image, vk::Format::eR8G8B8A8Unorm, imgSize, imgInfo.mipLevels);
+    vk::ImageViewCreateInfo ivInfo = nvvk::makeImageViewCreateInfo(image.image, imgInfo);
+    vk::SamplerCreateInfo   defaultSampler;
+    m_imageVkGL.texVk = m_alloc.createTexture(image, ivInfo, defaultSampler);
   }
 
-  m_imageVkGL.texVk.descriptor = nvvkpp::image::create2DDescriptor(m_device, m_imageVkGL.texVk.image);
-  m_imageVkGL.imgSize          = imgSize;
-  m_imageVkGL.mipLevels        = imgInfo.mipLevels;
+  m_imageVkGL.imgSize   = imgSize;
+  m_imageVkGL.mipLevels = imgInfo.mipLevels;
 
   createTextureGL(m_imageVkGL, GL_RGBA8, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT, m_dmaAllocGL);
 }
@@ -561,16 +564,22 @@ void VkGlExample::createGBuffers()
   m_gBufferColor[1].imgSize = m_size;
   m_gBufferColor[2].imgSize = m_size;
 
-  m_gBufferColor[0].texVk = m_alloc.createImage(nvvkpp::image::create2DInfo(m_size, vk::Format::eR32G32B32A32Sfloat));
-  m_gBufferColor[1].texVk = m_alloc.createImage(nvvkpp::image::create2DInfo(m_size, vk::Format::eR32G32B32A32Sfloat));
-  m_gBufferColor[2].texVk = m_alloc.createImage(nvvkpp::image::create2DInfo(m_size, vk::Format::eR8G8B8A8Unorm));
+  vk::ImageCreateInfo floatInfo = nvvk::makeImage2DCreateInfo(m_size, vk::Format::eR32G32B32A32Sfloat);
+  vk::ImageCreateInfo unormInfo = nvvk::makeImage2DCreateInfo(m_size, vk::Format::eR8G8B8A8Unorm);
 
-  m_gBufferColor[0].texVk.descriptor =
-      nvvkpp::image::create2DDescriptor(m_device, m_gBufferColor[0].texVk.image, samplerInfo, vk::Format::eR32G32B32A32Sfloat);
-  m_gBufferColor[1].texVk.descriptor =
-      nvvkpp::image::create2DDescriptor(m_device, m_gBufferColor[1].texVk.image, samplerInfo, vk::Format::eR32G32B32A32Sfloat);
-  m_gBufferColor[2].texVk.descriptor =
-      nvvkpp::image::create2DDescriptor(m_device, m_gBufferColor[2].texVk.image, samplerInfo, vk::Format::eR8G8B8A8Unorm);
+  std::array<nvvk::ImageDma, 3> image;
+  image[0] = m_alloc.createImage(floatInfo);
+  image[1] = m_alloc.createImage(floatInfo);
+  image[2] = m_alloc.createImage(unormInfo);
+  std::array<vk::ImageViewCreateInfo, 3> ivInfo;
+  ivInfo[0] = nvvk::makeImageViewCreateInfo(image[0].image, floatInfo);
+  ivInfo[1] = nvvk::makeImageViewCreateInfo(image[1].image, floatInfo);
+  ivInfo[2] = nvvk::makeImageViewCreateInfo(image[2].image, unormInfo);
+
+  m_gBufferColor[0].texVk = m_alloc.createTexture(image[0], ivInfo[0], samplerInfo);
+  m_gBufferColor[1].texVk = m_alloc.createTexture(image[1], ivInfo[1], samplerInfo);
+  m_gBufferColor[2].texVk = m_alloc.createTexture(image[2], ivInfo[2], samplerInfo);
+
 
   createTextureGL(m_gBufferColor[0], GL_RGBA32F, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_dmaAllocGL);
   createTextureGL(m_gBufferColor[1], GL_RGBA32F, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_dmaAllocGL);
@@ -581,13 +590,13 @@ void VkGlExample::createGBuffers()
   glNamedFramebufferTexture(m_gFramebuffer, GL_COLOR_ATTACHMENT2, m_gBufferColor[2].oglId, 0);
 
   {
-    nvvkpp::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
-    nvvkpp::image::setImageLayout(cmdBuf, m_gBufferColor[0].texVk.image, vk::ImageLayout::eUndefined,
-                                  vk::ImageLayout::eShaderReadOnlyOptimal);
-    nvvkpp::image::setImageLayout(cmdBuf, m_gBufferColor[1].texVk.image, vk::ImageLayout::eUndefined,
-                                  vk::ImageLayout::eShaderReadOnlyOptimal);
-    nvvkpp::image::setImageLayout(cmdBuf, m_gBufferColor[2].texVk.image, vk::ImageLayout::eUndefined,
-                                  vk::ImageLayout::eShaderReadOnlyOptimal);
+    nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_gBufferColor[0].texVk.image, vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eShaderReadOnlyOptimal);
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_gBufferColor[1].texVk.image, vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eShaderReadOnlyOptimal);
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_gBufferColor[2].texVk.image, vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   // - tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
@@ -615,7 +624,7 @@ void VkGlExample::createGBuffers()
 //
 void VkGlExample::onKeyboardChar(unsigned char key)
 {
-  nvvkpp::AppBase::onKeyboardChar(key);
+  nvvk::AppBase::onKeyboardChar(key);
   if(ImGui::GetIO().WantCaptureKeyboard)
   {
     return;
@@ -645,7 +654,7 @@ void VkGlExample::onKeyboardChar(unsigned char key)
 //
 void VkGlExample::onKeyboard(int key, int scancode, int action, int mods)
 {
-  nvvkpp::AppBase::onKeyboard(key, scancode, action, mods);
+  nvvk::AppBase::onKeyboard(key, scancode, action, mods);
 
   if(key == GLFW_KEY_HOME)
   {

@@ -27,7 +27,7 @@
 
 
 #include "raytrace_interop.hpp"
-#include "nvvkpp/utilities_vkpp.hpp"
+#include "nvvk/shaders_vk.hpp"
 
 extern std::vector<std::string> defaultSearchPaths;
 
@@ -35,7 +35,7 @@ extern std::vector<std::string> defaultSearchPaths;
 // Initializing the allocator GL which will be use to exchange with OpenGL (output image)
 // and DMA allocator for the ray tracer and other buffers
 //
-void nvvkpp::RtInterop::setup(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t queueIndex)
+void interop::RtInterop::setup(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t queueIndex)
 {
   m_device     = device;
   m_queueIndex = queueIndex;
@@ -46,14 +46,14 @@ void nvvkpp::RtInterop::setup(const vk::Device& device, const vk::PhysicalDevice
 
   // Using an allocator to exchange the result image
   m_dmaAllocGL.init(device, physicalDevice);
-  m_allocGL.init(device, &m_dmaAllocGL);
+  m_allocGL.init(device, physicalDevice, &m_dmaAllocGL);
 
   // Allocator for all the rest
   m_dmaAlloc.init(device, physicalDevice);
-  m_alloc.init(device, &m_dmaAlloc);
+  m_alloc.init(device, physicalDevice, &m_dmaAlloc);
 
   // BLAS and TLAS builder
-  m_rtBuilder.setup(device, m_dmaAlloc, queueIndex);
+  m_rtBuilder.setup(device, &m_alloc, queueIndex);
 
   // Command pool as queue family for graphics, even if raytracing
   m_rtCmdPool   = m_device.createCommandPool({vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueIndex});
@@ -64,7 +64,7 @@ void nvvkpp::RtInterop::setup(const vk::Device& device, const vk::PhysicalDevice
 //--------------------------------------------------------------------------------------------------
 //
 //
-void nvvkpp::RtInterop::destroy()
+void interop::RtInterop::destroy()
 {
   m_device.destroySemaphore(m_semaphores.vkComplete);
   m_device.destroySemaphore(m_semaphores.vkReady);
@@ -79,6 +79,9 @@ void nvvkpp::RtInterop::destroy()
   m_device.destroy(m_rtPipelineLayout);
   m_alloc.destroy(m_rtSBTBuffer);
 
+  m_alloc.deinit();
+  m_allocGL.deinit();
+
   m_dmaAllocGL.deinit();
   m_dmaAlloc.deinit();
 }
@@ -87,7 +90,7 @@ void nvvkpp::RtInterop::destroy()
 // Create the image containing the ambient occlusion information.
 // The values are stored in a eR32Sfloat / GL_R32F image
 //
-void nvvkpp::RtInterop::createOutputImage(vk::Extent2D size)
+void interop::RtInterop::createOutputImage(vk::Extent2D size)
 {
   auto usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc;
   vk::DeviceSize imgSize = size.width * size.height * 4 * sizeof(float);
@@ -95,18 +98,17 @@ void nvvkpp::RtInterop::createOutputImage(vk::Extent2D size)
   auto           layout  = vk::ImageLayout::eGeneral;
 
   vk::SamplerCreateInfo samplerCreateInfo;  // default values
-  vk::ImageCreateInfo   imageCreateInfo = nvvkpp::image::create2DInfo(size, format, usage);
+  vk::ImageCreateInfo   imageCreateInfo = nvvk::makeImage2DCreateInfo(size, format, usage);
 
   // Creating the image and the descriptor
-  m_rtOutputGL.imgSize = size;
-  m_rtOutputGL.texVk   = m_allocGL.createImage(imageCreateInfo);
-  m_rtOutputGL.texVk.descriptor =
-      nvvkpp::image::create2DDescriptor(m_device, m_rtOutputGL.texVk.image, vk::SamplerCreateInfo(), format, layout);
-
+  nvvk::ImageDma          image  = m_allocGL.createImage(imageCreateInfo);
+  vk::ImageViewCreateInfo ivInfo = nvvk::makeImageViewCreateInfo(image.image, imageCreateInfo);
+  m_rtOutputGL.texVk             = m_allocGL.createTexture(image, ivInfo, samplerCreateInfo);
+  m_rtOutputGL.imgSize           = size;
   {
     // Setting the layout to eGeneral
-    nvvkpp::ScopeCommandBuffer cmdBuf(m_device, m_queueIndex);
-    nvvkpp::image::setImageLayout(cmdBuf, m_rtOutputGL.texVk.image, vk::ImageLayout::eUndefined, layout);
+    nvvk::ScopeCommandBuffer cmdBuf(m_device, m_queueIndex);
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_rtOutputGL.texVk.image, vk::ImageLayout::eUndefined, layout);
   }
 
   // Making the OpenGL version of texture
@@ -116,7 +118,7 @@ void nvvkpp::RtInterop::createOutputImage(vk::Extent2D size)
 //--------------------------------------------------------------------------------------------------
 //
 //
-void nvvkpp::RtInterop::createDescriptorSet(const std::vector<nvvkpp::Texture2DVkGL>& gBuffers)
+void interop::RtInterop::createDescriptorSet(const std::vector<interop::Texture2DVkGL>& gBuffers)
 {
   // Descriptor Pool
   {
@@ -141,7 +143,8 @@ void nvvkpp::RtInterop::createDescriptorSet(const std::vector<nvvkpp::Texture2DV
 
   // (0) Bind the actual resources into the descriptor set Top-level acceleration structure
   {
-    vk::WriteDescriptorSetAccelerationStructureNV descAsInfo{1, &m_rtBuilder.getAccelerationStructure()};
+    vk::AccelerationStructureNV                   tlas = m_rtBuilder.getAccelerationStructure();
+    vk::WriteDescriptorSetAccelerationStructureNV descAsInfo{1, &tlas};
     vk::WriteDescriptorSet                        wds{m_rtDescSet, 0, 0, 1, vkDT::eAccelerationStructureNV};
     wds.setPNext(&descAsInfo);
     m_device.updateDescriptorSets(wds, nullptr);
@@ -153,7 +156,7 @@ void nvvkpp::RtInterop::createDescriptorSet(const std::vector<nvvkpp::Texture2DV
 //--------------------------------------------------------------------------------------------------
 // Will be called when resizing the window
 //
-void nvvkpp::RtInterop::updateDescriptorSet(const std::vector<nvvkpp::Texture2DVkGL>& gBuffers)
+void interop::RtInterop::updateDescriptorSet(const std::vector<interop::Texture2DVkGL>& gBuffers)
 {
   // (1) Output buffer
   {
@@ -177,11 +180,11 @@ void nvvkpp::RtInterop::updateDescriptorSet(const std::vector<nvvkpp::Texture2DV
 //--------------------------------------------------------------------------------------------------
 // Loading the ray tracer shaders aand creating the shader groups
 //
-void nvvkpp::RtInterop::createPipeline()
+void interop::RtInterop::createPipeline()
 {
   std::vector<std::string> paths = defaultSearchPaths;
-  vk::ShaderModule raygenSM = nvvkpp::util::createShaderModule(m_device, nvh::loadFile("shaders/raygen.rgen.spv", true, paths));
-  vk::ShaderModule missSM = nvvkpp::util::createShaderModule(m_device, nvh::loadFile("shaders/miss.rmiss.spv", true, paths));
+  vk::ShaderModule raygenSM = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raygen.rgen.spv", true, paths));
+  vk::ShaderModule missSM   = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/miss.rmiss.spv", true, paths));
 
   std::vector<vk::PipelineShaderStageCreateInfo>     stages;
   std::vector<vk::RayTracingShaderGroupCreateInfoNV> groups;
@@ -219,7 +222,7 @@ void nvvkpp::RtInterop::createPipeline()
 //--------------------------------------------------------------------------------------------------
 // Creating a buffer with the handles of the shader groups
 //
-void nvvkpp::RtInterop::createShadingBindingTable()
+void interop::RtInterop::createShadingBindingTable()
 {
   uint32_t groupCount      = 2;                                     // Two shaders: raygen, miss
   uint32_t groupHandleSize = m_rtProperties.shaderGroupHandleSize;  // Size of a program identifier
@@ -242,7 +245,7 @@ void nvvkpp::RtInterop::createShadingBindingTable()
 //--------------------------------------------------------------------------------------------------
 // Creating the semaphores of syncing with OpenGL
 //
-void nvvkpp::RtInterop::createSemaphores()
+void interop::RtInterop::createSemaphores()
 {
 #ifdef WIN32
   HANDLE glReadyHandle{INVALID_HANDLE_VALUE};
@@ -257,7 +260,7 @@ void nvvkpp::RtInterop::createSemaphores()
 #ifdef WIN32
     auto handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueWin32;
 #else
-    auto handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd;
+    auto handleType  = vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd;
 #endif
     {
       vk::SemaphoreCreateInfo       sci;
@@ -294,7 +297,7 @@ void nvvkpp::RtInterop::createSemaphores()
 //--------------------------------------------------------------------------------------------------
 // Executing ray tracer
 //
-void nvvkpp::RtInterop::run(int frame_number)
+void interop::RtInterop::run(int frame_number)
 {
   uint32_t progSize = m_rtProperties.shaderGroupHandleSize;  // Size of a program identifier
 

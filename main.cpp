@@ -50,9 +50,11 @@
 #include "nvgl/contextwindow_gl.hpp"
 #include "nvgl/extensions_gl.hpp"
 #include "nvpsystem.hpp"
+#include "nvvk/context_vk.hpp"
 #include "nvvk/extensions_vk.hpp"
-#include "nvvkpp/context_vkpp.hpp"
 #include "vkglexample.h"
+
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 int const SAMPLE_SIZE_WIDTH  = 1200;
 int const SAMPLE_SIZE_HEIGHT = 900;
@@ -84,7 +86,7 @@ int main(int argc, char** argv)
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);  // Enable vsync
 
-  nvvkpp::ContextCreateInfo deviceInfo;
+  nvvk::ContextCreateInfo deviceInfo;
   deviceInfo.addInstanceExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
   deviceInfo.addInstanceExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
   deviceInfo.addInstanceExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
@@ -106,7 +108,7 @@ int main(int argc, char** argv)
   deviceInfo.addDeviceExtension(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
 
   // Creating the Vulkan instance and device
-  nvvkpp::Context vkctx;
+  nvvk::Context vkctx;
   vkctx.init(deviceInfo);
 
 
@@ -128,11 +130,12 @@ int main(int argc, char** argv)
   // Loading all OpenGL symbols
   load_GL(nvgl::ContextWindow::sysGetProcAddress);
 
-  // Printing which GPU we are using for Vulkan
-  std::cout << "Using " << vkctx.m_physicalDevice.getProperties().deviceName << std::endl;
-
   // Setup the Vulkan base elements
-  example.setup(vkctx.m_device, vkctx.m_physicalDevice, vkctx.m_queueGCT.familyIndex);
+  example.setup(vkctx.m_instance, vkctx.m_device, vkctx.m_physicalDevice, vkctx.m_queueGCT.familyIndex);
+
+  // Printing which GPU we are using for Vulkan
+  std::cout << "Using " << example.getPhysicalDevice().getProperties().deviceName << std::endl;
+
 
   // Initialize the window, UI ..
   example.initUI(SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT);
