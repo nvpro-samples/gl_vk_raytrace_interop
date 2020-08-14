@@ -464,6 +464,7 @@ void VkGlExample::loadImage(const std::string& filename)
   auto imgSize = vk::Extent2D(w, h);
   auto imgInfo = nvvk::makeImage2DCreateInfo(imgSize, vk::Format::eR8G8B8A8Unorm, vk::ImageUsageFlagBits::eSampled, true);
 
+
   {
     nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
     nvvk::ImageDma image = m_alloc.createImage(cmdBuf, dataSize, dataImage, imgInfo, vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -472,6 +473,8 @@ void VkGlExample::loadImage(const std::string& filename)
     vk::SamplerCreateInfo   defaultSampler;
     m_imageVkGL.texVk = m_alloc.createTexture(image, ivInfo, defaultSampler);
   }
+
+  stbi_image_free(dataImage);
 
   m_imageVkGL.imgSize   = imgSize;
   m_imageVkGL.mipLevels = imgInfo.mipLevels;

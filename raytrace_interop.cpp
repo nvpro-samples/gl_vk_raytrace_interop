@@ -224,11 +224,12 @@ void interop::RtInterop::createPipeline()
 //
 void interop::RtInterop::createShadingBindingTable()
 {
-  uint32_t groupCount      = 2;                                     // Two shaders: raygen, miss
-  uint32_t groupHandleSize = m_rtProperties.shaderGroupHandleSize;  // Size of a program identifier
+  uint32_t groupCount      = 2;                                        // Two shaders: raygen, miss
+  uint32_t groupHandleSize = m_rtProperties.shaderGroupHandleSize;     // Size of a program handle
+  uint32_t groupSize       = m_rtProperties.shaderGroupBaseAlignment;  // Size of a program identifier
 
   // Fetch all the shader handles used in the pipeline, so that they can be written in the SBT
-  uint32_t             sbtSize = groupCount * groupHandleSize;
+  uint32_t             sbtSize = groupCount * groupSize;
   std::vector<uint8_t> shaderHandleStorage(sbtSize);
   m_device.getRayTracingShaderGroupHandlesNV(m_rtPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data());
 
@@ -237,7 +238,7 @@ void interop::RtInterop::createShadingBindingTable()
   // Write the handles in the SBT
   auto* pData = reinterpret_cast<uint8_t*>(m_alloc.map(m_rtSBTBuffer));
   memcpy(pData, shaderHandleStorage.data() + 0 * groupHandleSize, groupHandleSize);  // raygen
-  pData += groupHandleSize;
+  pData += groupSize;
   memcpy(pData, shaderHandleStorage.data() + 1 * groupHandleSize, groupHandleSize);  // miss
   m_alloc.unmap(m_rtSBTBuffer);
 }
@@ -299,7 +300,7 @@ void interop::RtInterop::createSemaphores()
 //
 void interop::RtInterop::run(int frame_number)
 {
-  uint32_t progSize = m_rtProperties.shaderGroupHandleSize;  // Size of a program identifier
+  uint32_t progSize = m_rtProperties.shaderGroupBaseAlignment;  // Size of a program identifier
 
   m_pushC.frame_number = frame_number;
 
@@ -312,8 +313,8 @@ void interop::RtInterop::run(int frame_number)
   vk::DeviceSize rayGenOffset   = 0;
   vk::DeviceSize missOffset     = progSize;
   vk::DeviceSize missStride     = progSize;
-  vk::DeviceSize hitGroupOffset = progSize + progSize;
-  vk::DeviceSize hitGroupStride = progSize;
+  vk::DeviceSize hitGroupOffset = 0;  // unused
+  vk::DeviceSize hitGroupStride = 0;
 
   m_rtCmdBuffer.traceRaysNV(m_rtSBTBuffer.buffer, rayGenOffset, m_rtSBTBuffer.buffer, missOffset, missStride,
                             m_rtSBTBuffer.buffer, hitGroupOffset, hitGroupStride, vk::Buffer{}, 0, 0,
