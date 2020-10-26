@@ -46,6 +46,7 @@
 
 #include "vkglexample.h"
 
+#include "imgui_helper.h"
 #include "imgui_impl_glfw.h"
 #include <nvvk/extensions_vk.hpp>
 
@@ -500,25 +501,31 @@ void VkGlExample::createShaders()
 //
 void VkGlExample::drawUI()
 {
+  using Gui = ImGuiH::Control;
   ImGui_ImplGlfw_NewFrame();
 
   bool modified = false;
   ImGui::NewFrame();
-  ImGui::Begin("OpenGL Interrupt Example", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  {
-    ImGui::Text("Ambient Occlusion");
-    modified |= ImGui::Checkbox("Use", &m_aoUse);
-    ImGui::SameLine();
-    modified |= ImGui::Checkbox("Blur", &m_aoBlur);
-    modified |= ImGui::SliderInt("Blur Radius", &m_aoBlurRadius, 1, 5);
-    ImGui::Separator();
-    ImGui::Text("Raytrace AO");
-    modified |= ImGui::SliderInt("samples", &m_ray.m_pushC.rtao_samples, 1, 256);
-    modified |= ImGui::SliderFloat("radius", &m_ray.m_pushC.rtao_radius, 0.5f, 10.f, "%.1f", 2.f);
-    modified |= ImGui::SliderFloat("power", &m_ray.m_pushC.rtao_power, 1.f, 3.f, "%.1f", 2.f);
 
-    ImGui::Separator();
-    if(ImGui::CollapsingHeader("Buffers"))
+  ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right);
+  {
+    if(ImGui::CollapsingHeader("Ambient Occlusion", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+      int defInt{2};
+      modified |= Gui::Checkbox("Use", "", &m_aoUse);
+      modified |= Gui::Checkbox("Blur", "", &m_aoBlur);
+      modified |= Gui::Slider("Radius", "", &m_aoBlurRadius, &defInt, ImGuiH::Control::Flags::Normal, 1, 5);
+    }
+    if(ImGui::CollapsingHeader("Raytrace AO", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+      static interop::RtInterop::PushConstant d{};
+      modified |= Gui::Slider("samples", "", &m_ray.m_pushC.rtao_samples, &d.rtao_samples, ImGuiH::Control::Flags::Normal, 1, 256);
+      modified |= Gui::Slider("radius", "", &m_ray.m_pushC.rtao_radius, &d.rtao_radius, ImGuiH::Control::Flags::Normal,
+                              0.5f, 10.f, "%.1f");
+      modified |= Gui::Slider("power", "", &m_ray.m_pushC.rtao_power, &d.rtao_power, ImGuiH::Control::Flags::Normal, 1.f,
+                              3.f, "%.1f");
+    }
+    if(ImGui::CollapsingHeader("Buffers", ImGuiTreeNodeFlags_DefaultOpen))
     {
       ImGui::Columns(2, "cl");
       ImGui::RadioButton("Final", &m_bufferView, 0);
@@ -530,6 +537,8 @@ void VkGlExample::drawUI()
       ImGui::RadioButton("AO", &m_bufferView, 5);
       ImGui::Columns(1);
     }
+    ImGui::Separator();
+    Gui::Info("", "", "Press F10 to hide", ImGuiH::Control::Flags::Disabled);
   }
   ImGui::End();
   ImGui::Render();

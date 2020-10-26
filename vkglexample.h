@@ -110,8 +110,11 @@ public:
 
     // UI
     ImGui::CreateContext();
-    ImGui::InitGL();
     ImGui::GetIO().IniFilename = nullptr;  // Avoiding the INI file
+    ImGuiH::setStyle();
+    ImGuiH::setFonts();
+
+    ImGui::InitGL();
   }
 
   //- Override the default resize

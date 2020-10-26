@@ -163,7 +163,8 @@ int main(int argc, char** argv)
     imgui_io.DisplaySize = ImVec2(SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT);
 
     example.onWindowRefresh();
-    example.drawUI();
+    if(example.showGui())
+      example.drawUI();
 
     glfwSwapBuffers(window);
   }
