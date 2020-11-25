@@ -106,7 +106,7 @@ public:
   //
   void initUI(int width, int height)
   {
-    onWindowResize(width, height);
+    onFramebufferSize(width, height);
 
     // UI
     ImGui::CreateContext();
@@ -117,8 +117,8 @@ public:
     ImGui::InitGL();
   }
 
-  //- Override the default resize
-  void onWindowResize(int w, int h) override
+  //- Override the default resize, no swapchain
+  void onFramebufferSize(int w, int h) override
   {
     m_size.width  = w;
     m_size.height = h;
