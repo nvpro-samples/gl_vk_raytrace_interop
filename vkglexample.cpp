@@ -46,8 +46,8 @@
 
 #include "vkglexample.h"
 
-#include "imgui_helper.h"
-#include "imgui_impl_glfw.h"
+#include "imgui/backends/imgui_impl_glfw.h"
+#include "imgui/extras/imgui_helper.h"
 #include <nvvk/extensions_vk.hpp>
 
 
@@ -522,8 +522,8 @@ void VkGlExample::drawUI()
       modified |= Gui::Slider("samples", "", &m_ray.m_pushC.rtao_samples, &d.rtao_samples, ImGuiH::Control::Flags::Normal, 1, 256);
       modified |= Gui::Slider("radius", "", &m_ray.m_pushC.rtao_radius, &d.rtao_radius, ImGuiH::Control::Flags::Normal,
                               0.5f, 10.f, "%.1f");
-      modified |= Gui::Slider("power", "", &m_ray.m_pushC.rtao_power, &d.rtao_power, ImGuiH::Control::Flags::Normal, 1.f,
-                              3.f, "%.1f");
+      modified |= Gui::Slider("power", "", &m_ray.m_pushC.rtao_power, &d.rtao_power, ImGuiH::Control::Flags::Normal,
+                              1.f, 3.f, "%.1f");
     }
     if(ImGui::CollapsingHeader("Buffers", ImGuiTreeNodeFlags_DefaultOpen))
     {

@@ -30,7 +30,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include "gl_vkpp.hpp"
-#include "imgui_impl_gl.h"
+#include "imgui/backends/imgui_impl_gl.h"
 #include "nvgl/extensions_gl.hpp"
 #include "nvmath/nvmath.h"
 #include "nvvk/allocator_dma_vkgl.hpp"

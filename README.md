@@ -1,4 +1,4 @@
-﻿# OpenGL Interop - Raytracing
+# OpenGL Interop - Raytracing
 
 
 By [Martin-Karl Lefrançois](https://devblogs.nvidia.com/author/mlefrancois/)

@@ -182,9 +182,9 @@ void interop::RtInterop::updateDescriptorSet(const std::vector<interop::Texture2
 //
 void interop::RtInterop::createPipeline()
 {
-  std::vector<std::string> paths = defaultSearchPaths;
-  vk::ShaderModule raygenSM = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raygen.rgen.spv", true, paths));
-  vk::ShaderModule missSM   = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/miss.rmiss.spv", true, paths));
+  vk::ShaderModule raygenSM =
+      nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raygen.rgen.spv", true, defaultSearchPaths));
+  vk::ShaderModule missSM = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/miss.rmiss.spv", true, defaultSearchPaths));
 
   std::vector<vk::PipelineShaderStageCreateInfo>     stages;
   std::vector<vk::RayTracingShaderGroupCreateInfoNV> groups;
