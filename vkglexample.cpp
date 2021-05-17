@@ -1,28 +1,20 @@
-/* Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+/*
+ * Copyright (c) 2019-2021, NVIDIA CORPORATION.  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2021 NVIDIA CORPORATION
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -42,14 +34,13 @@
 #include <random>  // Used to randomly place objects
 #include <sstream>
 
-#include <fileformats/stb_image.h>
+#include <stb_image.h>
 
-#include "vkglexample.h"
-
-#include "imgui/backends/imgui_impl_glfw.h"
-#include "imgui/extras/imgui_helper.h"
+#include "backends/imgui_impl_glfw.h"
+#include "imgui/imgui_helper.h"
 #include <nvvk/extensions_vk.hpp>
 
+#include "vkglexample.h"
 
 #define NB_MAX_TETRAHEDRONS 10000
 #define UBO_MATRIX 0
@@ -112,19 +103,18 @@ void VkGlExample::destroy()
   m_device.waitIdle();
   for(auto& mesh : m_meshes)
   {
-    mesh.destroy(m_alloc);
+    mesh.destroy(m_allocInterop);
   }
 
+  m_imageVkGL.destroy(m_allocInterop);
+  m_gBufferColor[0].destroy(m_allocInterop);
+  m_gBufferColor[1].destroy(m_allocInterop);
+  m_gBufferColor[2].destroy(m_allocInterop);
 
-  m_imageVkGL.destroy(m_alloc);
-  m_gBufferColor[0].destroy(m_alloc);
-  m_gBufferColor[1].destroy(m_alloc);
-  m_gBufferColor[2].destroy(m_alloc);
-
-  m_uniformBuffers.matrices.destroy(m_alloc);
+  m_uniformBuffers.matrices.destroy(m_allocInterop);
   m_ray.destroy();
-  m_alloc.deinit();
-  m_dmaAllocGL.deinit();
+  m_allocInterop.deinit();
+  m_allocInterop.deinit();
   AppBase::destroy();
 }
 
@@ -205,19 +195,17 @@ VkGlExample::Meshes VkGlExample::createFacetedTetrahedron()
   }
 
   // Storing the mesh in a buffer of vertices and a buffer of indices
-  // #VKGL: The buffer creation need this export extension
-  vk::ExportMemoryAllocateInfo exportAllocInfo(vk::ExternalMemoryHandleTypeFlagBits::eOpaqueWin32);
   Meshes                       mesh;
   mesh.indexCount  = (uint32_t)indices.size();
   mesh.vertexCount = (uint32_t)vert.size();
 
   {
     nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
-    mesh.vertices.bufVk = m_alloc.createBuffer<Vertex>(cmdBuf, vert, vk::BufferUsageFlagBits::eVertexBuffer);
-    mesh.indices.bufVk  = m_alloc.createBuffer<uint32_t>(cmdBuf, indices, vk::BufferUsageFlagBits::eIndexBuffer);
+    mesh.vertices.bufVk = m_allocInterop.createBuffer<Vertex>(cmdBuf, vert, vk::BufferUsageFlagBits::eVertexBuffer);
+    mesh.indices.bufVk  = m_allocInterop.createBuffer<uint32_t>(cmdBuf, indices, vk::BufferUsageFlagBits::eIndexBuffer);
     vulkanMeshToOpenGL(mesh);
   }
-  m_alloc.finalizeAndReleaseStaging();
+  m_allocInterop.finalizeAndReleaseStaging();
 
   return mesh;
 }
@@ -256,10 +244,10 @@ VkGlExample::Meshes VkGlExample::createPlane()
   mesh.vertexCount = (uint32_t)vert.size();
   {
     nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
-    mesh.vertices.bufVk = m_alloc.createBuffer<Vertex>(cmdBuf, vert, vk::BufferUsageFlagBits::eVertexBuffer);
-    mesh.indices.bufVk  = m_alloc.createBuffer<uint32_t>(cmdBuf, indices, vk::BufferUsageFlagBits::eIndexBuffer);
+    mesh.vertices.bufVk = m_allocInterop.createBuffer<Vertex>(cmdBuf, vert, vk::BufferUsageFlagBits::eVertexBuffer);
+    mesh.indices.bufVk  = m_allocInterop.createBuffer<uint32_t>(cmdBuf, indices, vk::BufferUsageFlagBits::eIndexBuffer);
   }
-  m_alloc.finalizeAndReleaseStaging();
+  m_allocInterop.finalizeAndReleaseStaging();
 
   vulkanMeshToOpenGL(mesh);
   return mesh;
@@ -270,8 +258,8 @@ VkGlExample::Meshes VkGlExample::createPlane()
 //
 void VkGlExample::vulkanMeshToOpenGL(Meshes& mesh)
 {
-  createBufferGL(mesh.vertices, m_dmaAllocGL);
-  createBufferGL(mesh.indices, m_dmaAllocGL);
+  createBufferGL(mesh.vertices, m_allocInterop);
+  createBufferGL(mesh.indices, m_allocInterop);
 
 
   int pos_loc = 0;  // See shaderGL.vert location
@@ -333,10 +321,10 @@ void VkGlExample::prepareUniformBuffers()
   {
     nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
     m_uniformBuffers.matrices.bufVk =
-        m_alloc.createBuffer<nvmath::mat4f>(cmdBuf, allMatrices, vk::BufferUsageFlagBits::eStorageBuffer);
-    createBufferGL(m_uniformBuffers.matrices, m_dmaAllocGL);
+        m_allocInterop.createBuffer<nvmath::mat4f>(cmdBuf, allMatrices, vk::BufferUsageFlagBits::eStorageBuffer);
+    createBufferGL(m_uniformBuffers.matrices, m_allocInterop);
   }
-  m_alloc.finalizeAndReleaseStaging();
+  m_allocInterop.finalizeAndReleaseStaging();
 }
 
 //--------------------------------------------------------------------------------
@@ -468,11 +456,11 @@ void VkGlExample::loadImage(const std::string& filename)
 
   {
     nvvk::ScopeCommandBuffer cmdBuf(m_device, m_graphicsQueueIndex);
-    nvvk::ImageDma image = m_alloc.createImage(cmdBuf, dataSize, dataImage, imgInfo, vk::ImageLayout::eShaderReadOnlyOptimal);
+    nvvk::Image image = m_allocInterop.createImage(cmdBuf, dataSize, dataImage, imgInfo, vk::ImageLayout::eShaderReadOnlyOptimal);
     nvvk::cmdGenerateMipmaps(cmdBuf, image.image, vk::Format::eR8G8B8A8Unorm, imgSize, imgInfo.mipLevels);
     vk::ImageViewCreateInfo ivInfo = nvvk::makeImageViewCreateInfo(image.image, imgInfo);
     vk::SamplerCreateInfo   defaultSampler;
-    m_imageVkGL.texVk = m_alloc.createTexture(image, ivInfo, defaultSampler);
+    m_imageVkGL.texVk = m_allocInterop.createTexture(image, ivInfo, defaultSampler);
   }
 
   stbi_image_free(dataImage);
@@ -480,7 +468,7 @@ void VkGlExample::loadImage(const std::string& filename)
   m_imageVkGL.imgSize   = imgSize;
   m_imageVkGL.mipLevels = imgInfo.mipLevels;
 
-  createTextureGL(m_imageVkGL, GL_RGBA8, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT, m_dmaAllocGL);
+  createTextureGL(m_imageVkGL, GL_RGBA8, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT, m_allocInterop);
 }
 
 
@@ -559,9 +547,9 @@ void VkGlExample::createGBuffers()
   if(m_gFramebuffer != 0)
   {
     glDeleteFramebuffers(1, &m_gFramebuffer);
-    m_gBufferColor[0].destroy(m_alloc);
-    m_gBufferColor[1].destroy(m_alloc);
-    m_gBufferColor[2].destroy(m_alloc);
+    m_gBufferColor[0].destroy(m_allocInterop);
+    m_gBufferColor[1].destroy(m_allocInterop);
+    m_gBufferColor[2].destroy(m_allocInterop);
   }
 
   glCreateFramebuffers(1, &m_gFramebuffer);
@@ -579,23 +567,23 @@ void VkGlExample::createGBuffers()
   vk::ImageCreateInfo floatInfo = nvvk::makeImage2DCreateInfo(m_size, vk::Format::eR32G32B32A32Sfloat);
   vk::ImageCreateInfo unormInfo = nvvk::makeImage2DCreateInfo(m_size, vk::Format::eR8G8B8A8Unorm);
 
-  std::array<nvvk::ImageDma, 3> image;
-  image[0] = m_alloc.createImage(floatInfo);
-  image[1] = m_alloc.createImage(floatInfo);
-  image[2] = m_alloc.createImage(unormInfo);
+  std::array<nvvk::Image, 3> image;
+  image[0] = m_allocInterop.createImage(floatInfo);
+  image[1] = m_allocInterop.createImage(floatInfo);
+  image[2] = m_allocInterop.createImage(unormInfo);
   std::array<vk::ImageViewCreateInfo, 3> ivInfo;
   ivInfo[0] = nvvk::makeImageViewCreateInfo(image[0].image, floatInfo);
   ivInfo[1] = nvvk::makeImageViewCreateInfo(image[1].image, floatInfo);
   ivInfo[2] = nvvk::makeImageViewCreateInfo(image[2].image, unormInfo);
 
-  m_gBufferColor[0].texVk = m_alloc.createTexture(image[0], ivInfo[0], samplerInfo);
-  m_gBufferColor[1].texVk = m_alloc.createTexture(image[1], ivInfo[1], samplerInfo);
-  m_gBufferColor[2].texVk = m_alloc.createTexture(image[2], ivInfo[2], samplerInfo);
+  m_gBufferColor[0].texVk = m_allocInterop.createTexture(image[0], ivInfo[0], samplerInfo);
+  m_gBufferColor[1].texVk = m_allocInterop.createTexture(image[1], ivInfo[1], samplerInfo);
+  m_gBufferColor[2].texVk = m_allocInterop.createTexture(image[2], ivInfo[2], samplerInfo);
 
 
-  createTextureGL(m_gBufferColor[0], GL_RGBA32F, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_dmaAllocGL);
-  createTextureGL(m_gBufferColor[1], GL_RGBA32F, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_dmaAllocGL);
-  createTextureGL(m_gBufferColor[2], GL_RGBA8, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_dmaAllocGL);
+  createTextureGL(m_gBufferColor[0], GL_RGBA32F, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_allocInterop);
+  createTextureGL(m_gBufferColor[1], GL_RGBA32F, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_allocInterop);
+  createTextureGL(m_gBufferColor[2], GL_RGBA8, GL_NEAREST, GL_NEAREST, GL_REPEAT, m_allocInterop);
 
   glNamedFramebufferTexture(m_gFramebuffer, GL_COLOR_ATTACHMENT0, m_gBufferColor[0].oglId, 0);
   glNamedFramebufferTexture(m_gFramebuffer, GL_COLOR_ATTACHMENT1, m_gBufferColor[1].oglId, 0);
