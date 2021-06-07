@@ -34,6 +34,9 @@
 #include <memory>
 
 #include "utility_ogl.hpp"
+#include "nvvk/stagingmemorymanager_vk.hpp"
+ 
+
 //--------------------------------------------------------------------------------------------------
 // This holds the buffer and texture Vulkan-OpenGL variation
 // and the utilities to create the OpenGL version of buffers and textures from the Vulkan objects
@@ -42,9 +45,10 @@
 
 namespace interop {
 
-// ResourceAllocatorDmaGL is a convenience class owning a DMAMemoryAllocator and DeviceMemoryAllocatorGL object.
-// By deriving from nvvk::ExportResourceAllocator we make sure all created objects' underlying memory
-// will be exportable.
+//--------------------------------------------------------------------------------------------------
+// ResourceAllocatorGLInterop is a ResourceAllocator using DeviceMemoryAllocatorGL as underlying allocator.
+// Vulkan device memory allocations will be immediately imported into GL. The corresponding GL memory object
+// can be queried via getAllocationGL()
 class ResourceAllocatorGLInterop : public nvvk::ExportResourceAllocator
 {
 public:
@@ -57,28 +61,30 @@ public:
 
   void init(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE)
   {
-    m_dmaGL    = std::make_unique<nvvk::DeviceMemoryAllocatorGL>(device, physicalDevice);
-    m_memAlloc = std::make_unique<nvvk::DMAMemoryAllocator>(m_dmaGL.get());
-    nvvk::ResourceAllocator::init(device, physicalDevice, m_memAlloc.get(), stagingBlockSize);
+    m_dmaGL = std::make_unique<nvvk::DeviceMemoryAllocatorGL>(device, physicalDevice);
+    nvvk::ExportResourceAllocator::init(device, physicalDevice, m_dmaGL.get(), stagingBlockSize);
+
+    // The staging will only use DMA, without export functionality. 
+    m_dma = std::make_unique<nvvk::DeviceMemoryAllocator>(device, physicalDevice);
+    m_staging = std::make_unique<nvvk::StagingMemoryManager>(dynamic_cast<nvvk::MemAllocator*>(m_dma.get()), stagingBlockSize);
   }
 
   void deinit()
   {
-    m_memAlloc.reset();
-    m_dmaGL.reset();
     nvvk::ExportResourceAllocator::deinit();
+    m_dmaGL.reset();
+    m_dma.reset();
   }
 
   nvvk::DeviceMemoryAllocatorGL& getDmaGL() const { return *m_dmaGL; }
-  nvvk::DMAMemoryAllocator*      getMemoryAllocator() const { return m_memAlloc.get(); }
   nvvk::AllocationGL             getAllocationGL(nvvk::MemHandle memHandle) const
   {
-    return m_dmaGL->getAllocationGL(m_memAlloc->getAllocationID(memHandle));
+    return m_dmaGL->getAllocationGL(m_dmaGL->getAllocationID(memHandle));
   }
 
 protected:
   std::unique_ptr<nvvk::DeviceMemoryAllocatorGL> m_dmaGL;
-  std::unique_ptr<nvvk::DMAMemoryAllocator>      m_memAlloc;
+  std::unique_ptr<nvvk::DeviceMemoryAllocator> m_dma;
 };
 
 
