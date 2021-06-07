@@ -106,10 +106,6 @@ int main(int argc, char** argv)
   vkctx.init(deviceInfo);
 
 
-  // Loading the C version of the extensions
-  load_VK_EXTENSION_SUBSET(vkctx.m_instance, vkGetInstanceProcAddr, vkctx.m_device, vkGetDeviceProcAddr);
-
-
   VkGlExample         example;
   nvgl::ContextWindow contextWindowGL;
 
