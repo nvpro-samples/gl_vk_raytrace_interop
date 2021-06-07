@@ -219,7 +219,7 @@ void interop::RtInterop::createShadingBindingTable()
   // Fetch all the shader handles used in the pipeline, so that they can be written in the SBT
   uint32_t             sbtSize = groupCount * groupSize;
   std::vector<uint8_t> shaderHandleStorage(sbtSize);
-  m_device.getRayTracingShaderGroupHandlesNV(m_rtPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data());
+  vk::Result result = m_device.getRayTracingShaderGroupHandlesNV(m_rtPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data());
 
   m_rtSBTBuffer = m_alloc.createBuffer(sbtSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible);
 
