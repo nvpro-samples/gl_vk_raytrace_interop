@@ -284,7 +284,7 @@ void VkGlExample::vulkanMeshToOpenGL(Meshes& mesh)
 //--------------------------------------------------------------------------------------------------
 // Converting the Mesh to Vulkan raytracing geometry
 //
-vk::GeometryNV VkGlExample::meshToGeometry(const Meshes& mesh)
+VkGeometryNV VkGlExample::meshToGeometry(const Meshes& mesh)
 {
   vk::GeometryTrianglesNV triangles;
   triangles.setVertexData(mesh.vertices.bufVk.buffer);
@@ -302,7 +302,7 @@ vk::GeometryNV VkGlExample::meshToGeometry(const Meshes& mesh)
   geometry.setGeometry(geoData);
   geometry.setFlags(vk::GeometryFlagBitsNV::eOpaque);
 
-  return geometry;
+  return static_cast<VkGeometryNV>(geometry);
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -145,7 +145,7 @@ private:
   void vulkanMeshToOpenGL(Meshes& mesh);
   void createGBuffers();
 
-  vk::GeometryNV meshToGeometry(const Meshes& mesh);
+  VkGeometryNV meshToGeometry(const Meshes& mesh);
 
   Meshes createPlane();
   Meshes createFacetedTetrahedron();

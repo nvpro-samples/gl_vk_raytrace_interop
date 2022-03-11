@@ -90,7 +90,7 @@ void interop::RtInterop::createOutputImage(vk::Extent2D size)
 
   // Creating the image and the descriptor
   nvvk::Image          image  = m_allocGL.createImage(imageCreateInfo);
-  vk::ImageViewCreateInfo ivInfo = nvvk::makeImageViewCreateInfo(image.image, imageCreateInfo);
+  vk::ImageViewCreateInfo ivInfo = nvvk::makeImageViewCreateInfo(vk::Image(image.image), imageCreateInfo);
   m_rtOutputGL.texVk             = m_allocGL.createTexture(image, ivInfo, samplerCreateInfo);
   m_rtOutputGL.imgSize           = size;
   {
@@ -201,7 +201,7 @@ void interop::RtInterop::createPipeline()
   rayPipelineInfo.setPGroups(groups.data());
   rayPipelineInfo.setMaxRecursionDepth(2);
   rayPipelineInfo.setLayout(m_rtPipelineLayout);
-  m_rtPipeline = static_cast<const vk::Pipeline&>(m_device.createRayTracingPipelineNV({}, rayPipelineInfo));
+  m_rtPipeline = m_device.createRayTracingPipelineNV({}, rayPipelineInfo).value;
 
   m_device.destroyShaderModule(raygenSM);
   m_device.destroyShaderModule(missSM);
