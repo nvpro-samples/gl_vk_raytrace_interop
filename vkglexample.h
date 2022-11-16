@@ -24,7 +24,7 @@
 #include "imgui/backends/imgui_impl_gl.h"
 #include "nvgl/extensions_gl.hpp"
 #include "nvmath/nvmath.h"
-#include "nvvk/appbase_vkpp.hpp"
+#include "nvvkhl/appbase_vkpp.hpp"
 #include "nvvk/memallocator_dma_vk.hpp"
 #include "nvvk/resourceallocator_vk.hpp"
 
@@ -34,7 +34,7 @@
 //--------------------------------------------------------------------------------------------------
 // Simple example showing some objects, simple material and lighting, camera movement
 //
-class VkGlExample : public nvvk::AppBase
+class VkGlExample : public nvvkhl::AppBase
 {
 public:
   // Structure of the Vertices used by the shaders

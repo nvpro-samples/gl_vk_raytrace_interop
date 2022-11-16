@@ -624,7 +624,7 @@ void VkGlExample::createGBuffers()
 //
 void VkGlExample::onKeyboardChar(unsigned char key)
 {
-  nvvk::AppBase::onKeyboardChar(key);
+  nvvkhl::AppBase::onKeyboardChar(key);
   if(ImGui::GetIO().WantCaptureKeyboard)
   {
     return;
@@ -654,7 +654,7 @@ void VkGlExample::onKeyboardChar(unsigned char key)
 //
 void VkGlExample::onKeyboard(int key, int scancode, int action, int mods)
 {
-  nvvk::AppBase::onKeyboard(key, scancode, action, mods);
+  nvvkhl::AppBase::onKeyboard(key, scancode, action, mods);
 
   if(key == GLFW_KEY_HOME)
   {
