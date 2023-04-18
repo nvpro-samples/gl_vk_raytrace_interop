@@ -158,7 +158,11 @@ int main(int argc, char** argv)
 
     glfwSwapBuffers(window);
   }
-
+  
+  // ImGui Shutdown and DestroyContext must be called before example.destroy(), because
+  // AppBase.destroy() assumes Vulkan-ImGui was used even though we used OpenGL-ImGui
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
   example.destroy();
   vkctx.deinit();
 
