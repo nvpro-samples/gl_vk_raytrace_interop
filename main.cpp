@@ -27,27 +27,17 @@
 //
 
 #ifdef WIN32
-#include <accctrl.h>
-#include <aclapi.h>
+#include <windows.h>
 #endif
-#include <array>
-#include <chrono>
-#include <vulkan/vulkan.hpp>
-
 
 #define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include "backends/imgui_impl_glfw.h"
-#include "imgui.h"
 #include "nvgl/contextwindow_gl.hpp"
-#include "nvgl/extensions_gl.hpp"
-#include "nvpsystem.hpp"
 #include "nvvk/context_vk.hpp"
-#include "nvvk/extensions_vk.hpp"
-#include "stb_image.h"
 #include "vkglexample.h"
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 int const SAMPLE_SIZE_WIDTH  = 1200;
 int const SAMPLE_SIZE_HEIGHT = 900;
@@ -109,14 +99,6 @@ int main(int argc, char** argv)
   VkGlExample         example;
   nvgl::ContextWindow contextWindowGL;
 
-  //// Creating the window
-  //example.open(0, 0, SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT, PROJECT_NAME);
-
-  //// OpenGL context within the Window
-  //contextWindowGL.init(&context, example.m_internal, PROJECT_NAME);
-  //contextWindowGL.makeContextCurrent();
-  //contextWindowGL.swapInterval(0);
-
   // Loading all OpenGL symbols
   load_GL(nvgl::ContextWindow::sysGetProcAddress);
 
@@ -124,14 +106,17 @@ int main(int argc, char** argv)
   example.setup(vkctx.m_instance, vkctx.m_device, vkctx.m_physicalDevice, vkctx.m_queueGCT.familyIndex);
 
   // Printing which GPU we are using for Vulkan
-  std::cout << "Using " << example.getPhysicalDevice().getProperties().deviceName << std::endl;
-
+  {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(example.getPhysicalDevice(), &properties);
+    std::cout << "Using " << properties.deviceName << std::endl;
+  }
 
   // Initialize the window, UI ..
   example.initUI(SAMPLE_SIZE_WIDTH, SAMPLE_SIZE_HEIGHT);
 
-  // Various ways of creating vertex buffers
-  example.initExample();
+  // Creating the scene and more
+  example.createExample();
 
   // GLFW Callback
   example.setupGlfwCallbacks(window);

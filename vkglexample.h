@@ -17,26 +17,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <vulkan/vulkan.hpp>
-
-#include <array>
-
-#include "imgui/backends/imgui_impl_gl.h"
+#include "backends/imgui_impl_gl.h"
 #include "nvgl/extensions_gl.hpp"
-#include "nvmath/nvmath.h"
-#include "nvvkhl/appbase_vkpp.hpp"
-#include "nvvk/memallocator_dma_vk.hpp"
-#include "nvvk/resourceallocator_vk.hpp"
-
-#include "gl_vkpp.hpp"
+#include "nvvkhl/appbase_vk.hpp"
 #include "raytrace_interop.hpp"
 
 //--------------------------------------------------------------------------------------------------
 // Simple example showing some objects, simple material and lighting, camera movement
 //
-class VkGlExample : public nvvkhl::AppBase
+class VkGlExample : public nvvkhl::AppBaseVk
 {
 public:
+  VkGlExample() = default;
+
+  // AppBaseVk
+  void setup(const VkInstance& instance, const VkDevice& device, const VkPhysicalDevice& physicalDevice, uint32_t graphicsQueueIndex) override;
+  void destroy() override;
+  void onResize(int w, int h) override;
+  void onKeyboardChar(unsigned char) override;
+  void onKeyboard(int key, int scancode, int action, int mods) override;
+  void onFramebufferSize(int w, int h) override;
+
+  void createExample();
+  void drawUI();
+  void onWindowRefresh();
+  void initUI(int width, int height);
+
+private:
   // Structure of the Vertices used by the shaders
   struct Vertex
   {
@@ -50,10 +57,10 @@ public:
   {
     interop::BufferVkGL vertices;
     interop::BufferVkGL indices;
-    uint32_t            indexCount{0};   // Nb of indices to draw
-    uint32_t            vertexCount{0};  // Nb vertices
-    GLuint              oglID{0};        // OpenGL
-    vk::GeometryNV      rayGeometry;     // Raytrace
+    uint32_t            indexCount  = 0;   // Nb of indices to draw
+    uint32_t            vertexCount = 0;   // Nb vertices
+    GLuint              oglID       = 0;   // OpenGL
+    VkGeometryNV        rayGeometry = {};  // Raytrace
 
     void destroy(nvvk::ResourceAllocator& alloc)
     {
@@ -70,69 +77,17 @@ public:
   };
 
 
-  VkGlExample() = default;
-
-  void setup(const vk::Instance& instance, const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t graphicsQueueIndex) override
-  {
-    AppBase::setup(instance, device, physicalDevice, graphicsQueueIndex);
-
-    m_allocInterop.init(device, physicalDevice);
-
-    m_ray.setup(device, physicalDevice, graphicsQueueIndex);
-  }
-
-  void initExample();
-  bool needToResetFrame();
-  void drawUI();
-
-  void onWindowRefresh();
-  void destroy() override;
-  void onResize(int w, int h) override;
-  void onKeyboardChar(unsigned char) override;
-  void onKeyboard(int key, int scancode, int action, int mods) override;
-  void loadImage(const std::string& filename);
-  void createShaders();
-
-  //--------------------------------------------------------------------------------------------------
-  // Initialization of the GUI
-  // - Need to be call after the device creation
-  //
-  void initUI(int width, int height)
-  {
-    onFramebufferSize(width, height);
-
-    // UI
-    ImGui::CreateContext();
-    auto& io       = ImGui::GetIO();
-    io.IniFilename = nullptr;                          // Avoiding the INI file
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;  // Enable Docking
-    ImGuiH::setStyle();
-    ImGuiH::setFonts();
-
-    ImGui::InitGL();
-  }
-
-  //- Override the default resize, no swapchain
-  void onFramebufferSize(int w, int h) override
-  {
-    m_size.width  = w;
-    m_size.height = h;
-    CameraManip.setWindowSize(w, h);
-  }
-
-  std::vector<Meshes>   m_meshes;
-  std::vector<Instance> m_instances;
-
-
 private:
-  // Ui stuff
+  // User interface settings
   bool m_aoUse        = true;
   bool m_aoBlur       = true;
   int  m_aoBlurRadius = 2;
   int  m_rtNbRays     = 64;
   int  m_bufferView   = 0;
+  int  m_frameNumber  = 0;
 
-  int m_frameNumber = 0;
+  std::vector<Meshes>   m_meshes;
+  std::vector<Instance> m_instances;
 
   // The buffers used by the example
   struct
@@ -140,24 +95,23 @@ private:
     interop::BufferVkGL matrices;  // matrices of all instances
   } m_uniformBuffers;
 
-  void createScene();
-  void prepareUniformBuffers();
-  void vulkanMeshToOpenGL(Meshes& mesh);
-  void createGBuffers();
-
+  bool         needToResetFrame();
+  void         createScene();
+  void         prepareUniformBuffers();
+  void         vulkanMeshToOpenGL(Meshes& mesh);
+  void         createGBuffers();
   VkGeometryNV meshToGeometry(const Meshes& mesh);
+  Meshes       createPlane();
+  Meshes       createFacetedTetrahedron();
+  void         loadImage(const std::string& filename, interop::Texture2DVkGL& img);
+  void         createShaders();
 
-  Meshes createPlane();
-  Meshes createFacetedTetrahedron();
+  GLuint    m_gFramebuffer    = 0;
+  OglShader m_shaderRaster    = {};
+  OglShader m_shaderComposite = {};
 
-  interop::Texture2DVkGL              m_imageVkGL;
-  std::vector<interop::Texture2DVkGL> m_gBufferColor{{}, {}, {}};  // Position, Normal, Albedo
-
-  GLuint m_gFramebuffer = 0;
-  Shader m_shaderRaster;
-  Shader m_shaderComposite;
-  
-  interop::ResourceAllocatorGLInterop m_allocInterop;  // The Vulkan buffer and image allocator with Export
-
-  interop::RtInterop m_ray;
+  interop::ResourceAllocatorGLInterop   m_allocInterop;  // The Vulkan buffer and image allocator with Export
+  interop::RtInterop                    m_ray;
+  std::array<interop::Texture2DVkGL, 2> m_imageVkGL;
+  std::vector<interop::Texture2DVkGL>   m_gBufferColor{{}, {}, {}};  // Position, Normal, Albedo
 };

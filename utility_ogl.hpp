@@ -18,7 +18,6 @@
  */
 
 
-
 #pragma once
 #ifndef SHADER_H
 #define SHADER_H
@@ -27,15 +26,18 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <array>
 
-class Shader
+#include "nvmath/nvmath.h"
+
+class OglShader
 {
 public:
-  Shader() = default;
-  unsigned int ID;
+  OglShader()     = default;
+  unsigned int ID = 0;
   // constructor generates the shader on the fly
   // ------------------------------------------------------------------------
-  Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "")
+  OglShader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "")
   {
     // 1. retrieve the vertex/fragment source code from filePath
     std::string   vertexCode;
@@ -70,14 +72,14 @@ public:
         geometryCode = gShaderStream.str();
       }
     }
-    catch(std::ifstream::failure e)
+    catch(std::ifstream::failure& e)
     {
-      std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
+      std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ " << e.what() << std::endl;
     }
     const char* vShaderCode = vertexCode.c_str();
     const char* fShaderCode = fragmentCode.c_str();
     // 2. compile shaders
-    unsigned int vertex, fragment;
+    GLuint vertex{0}, fragment{0};
     // vertex shader
     vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vShaderCode, nullptr);
@@ -89,7 +91,7 @@ public:
     glCompileShader(fragment);
     checkCompileErrors(fragment, "FRAGMENT");
     // if geometry shader is given, compile geometry shader
-    unsigned int geometry{0};
+    GLuint geometry{0};
     if(!geometryPath.empty())
     {
       const char* gShaderCode = geometryCode.c_str();
@@ -118,12 +120,12 @@ public:
   }
   // activate the shader
   // ------------------------------------------------------------------------
-  void use() { glUseProgram(ID); }
+  void use() const { glUseProgram(ID); }
   // utility uniform functions
   // ------------------------------------------------------------------------
   void setBool(const std::string& name, bool value) const
   {
-    glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value);
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), static_cast<int>(value));
   }
   // ------------------------------------------------------------------------
   void setInt(const std::string& name, int value) const { glUniform1i(glGetUniformLocation(ID, name.c_str()), value); }
@@ -178,18 +180,19 @@ public:
 private:
   // utility function for checking shader compilation/linking errors.
   // ------------------------------------------------------------------------
-  void checkCompileErrors(GLuint shader, std::string type)
+  static void checkCompileErrors(GLuint shader, const std::string& type)
   {
-    GLint  success;
-    GLchar infoLog[1024];
+    GLint success{GL_FALSE};
+
+    std::array<GLchar, 1024> infoLog{};
     if(type != "PROGRAM")
     {
       glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
       if(success == GL_FALSE)
       {
-        glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
+        glGetShaderInfoLog(shader, static_cast<GLsizei>(infoLog.size()), nullptr, infoLog.data());
         std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n"
-                  << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+                  << infoLog.data() << "\n -- --------------------------------------------------- -- " << std::endl;
       }
     }
     else
@@ -197,20 +200,25 @@ private:
       glGetProgramiv(shader, GL_LINK_STATUS, &success);
       if(success == GL_FALSE)
       {
-        glGetProgramInfoLog(shader, 1024, nullptr, infoLog);
+        glGetProgramInfoLog(shader, static_cast<GLsizei>(infoLog.size()), nullptr, infoLog.data());
         std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n"
-                  << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+                  << infoLog.data() << "\n -- --------------------------------------------------- -- " << std::endl;
       }
     }
   }
 };
 
 
-inline void /*GLAPIENTRY */ GLDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+inline void /*GLAPIENTRY */ GLDebugCallback(GLenum source,
+                                            GLenum type,
+                                            GLuint id,
+                                            GLenum severity,
+                                            GLsizei /*length*/,
+                                            const GLchar* message,
+                                            const void* /*userParam*/)
 {
-  using namespace std;
-  cout << "[OpenGL]: ";
-  cout << "Source: ";
+  std::cout << "[OpenGL]: ";
+  std::cout << "Source: ";
   switch(source)
   {
     case GL_DEBUG_SOURCE_API:
@@ -233,56 +241,56 @@ inline void /*GLAPIENTRY */ GLDebugCallback(GLenum source, GLenum type, GLuint i
       break;
   }
 
-  cout << ", type: ";
+  std::cout << ", type: ";
   switch(type)
   {
     case GL_DEBUG_TYPE_ERROR:
-      cout << "ERROR";
+      std::cout << "ERROR";
       break;
     case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-      cout << "DEPRECATED_BEHAVIOR";
+      std::cout << "DEPRECATED_BEHAVIOR";
       break;
     case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
-      cout << "UNDEFINED_BEHAVIOR";
+      std::cout << "UNDEFINED_BEHAVIOR";
       break;
     case GL_DEBUG_TYPE_PORTABILITY:
-      cout << "PORTABILITY";
+      std::cout << "PORTABILITY";
       break;
     case GL_DEBUG_TYPE_PERFORMANCE:
-      cout << "PERFORMANCE";
+      std::cout << "PERFORMANCE";
       break;
     case GL_DEBUG_TYPE_OTHER:
-      cout << "OTHER";
+      std::cout << "OTHER";
       break;
     default:
-      cout << "OTHER";
+      std::cout << "OTHER";
   }
 
-  cout << ", id: " << id;
-  cout << ", severity: ";
+  std::cout << ", id: " << id;
+  std::cout << ", severity: ";
   switch(severity)
   {
     case GL_DEBUG_SEVERITY_LOW:
-      cout << "LOW";
+      std::cout << "LOW";
       break;
     case GL_DEBUG_SEVERITY_MEDIUM:
-      cout << "MEDIUM";
+      std::cout << "MEDIUM";
       break;
     case GL_DEBUG_SEVERITY_HIGH:
-      cout << "HIGH";
+      std::cout << "HIGH";
       break;
     default:
-      cout << "OTHER";
+      std::cout << "OTHER";
   }
 
-  cout << endl;
-  cout << "\"" << message << "\"" << endl << std::endl;
+  std::cout << std::endl;
+  std::cout << "\"" << message << "\"" << std::endl << std::endl;
 }
 
 inline void CheckGLError()
 {
   // check OpenGL error
-  GLenum err;
+  GLenum err{GL_NO_ERROR};
   while((err = glGetError()) != GL_NO_ERROR)
   {
     std::cerr << "OpenGL error: " << err << std::endl << std::endl;

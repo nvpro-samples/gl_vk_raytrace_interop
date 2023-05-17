@@ -24,10 +24,7 @@
 // Raytracing implementation for the Vulkan Interop (G-Buffers)
 //////////////////////////////////////////////////////////////////////////
 
-#include "nvmath/nvmath.h"
-
 #include "gl_vkpp.hpp"
-#include "nvh/fileoperations.hpp"
 #include "nvvk/raytraceNV_vk.hpp"
 
 
@@ -35,27 +32,27 @@ namespace interop {
 
 struct RtInterop
 {
-  using vkDT   = vk::DescriptorType;
-  using vkSS   = vk::ShaderStageFlagBits;
-  using vkCB   = vk::CommandBufferUsageFlagBits;
-  using vkDSLB = vk::DescriptorSetLayoutBinding;
+  using vkDT   = VkDescriptorType;
+  using vkSS   = VkShaderStageFlagBits;
+  using vkCB   = VkCommandBufferUsageFlagBits;
+  using vkDSLB = VkDescriptorSetLayoutBinding;
 
   // Information push at each call
   struct PushConstant
   {
     int   rtao_samples = 64;
-    float rtao_radius  = 5.f;
-    float rtao_power   = 2.f;
+    float rtao_radius  = 5.F;
+    float rtao_power   = 2.F;
     int   frame_number = 0;
   } m_pushC;
 
   // For synchronizing with OpenGL
   struct Semaphore
   {
-    vk::Semaphore vkReady;
-    vk::Semaphore vkComplete;
-    GLuint        glReady    = 0;
-    GLuint        glComplete = 0;
+    VkSemaphore vkReady;
+    VkSemaphore vkComplete;
+    GLuint      glReady    = 0;
+    GLuint      glComplete = 0;
   } m_semaphores;
 
   // Default constructor
@@ -67,9 +64,9 @@ struct RtInterop
   nvvk::RaytracingBuilderNV&    builder() { return m_rtBuilder; }
 
   //
-  void setup(const vk::Device& device, const vk::PhysicalDevice& physicalDevice, uint32_t queueIndex);
+  void setup(const VkDevice& device, const VkPhysicalDevice& physicalDevice, uint32_t queueIndex);
   void destroy();
-  void createOutputImage(vk::Extent2D size);
+  void createOutputImage(VkExtent2D size);
   void createDescriptorSet(const std::vector<interop::Texture2DVkGL>& gBuffers);
   void updateDescriptorSet(const std::vector<interop::Texture2DVkGL>& gBuffers);
   void createPipeline();
@@ -83,23 +80,23 @@ private:
   ResourceAllocatorGLInterop m_allocGL;
   nvvk::ResourceAllocatorDma m_alloc;
   //
-  vk::Device m_device;
-  uint32_t   m_queueIndex;
+  VkDevice m_device     = VK_NULL_HANDLE;
+  uint32_t m_queueIndex = 0;
 
   // Ray tracing specific
   interop::Texture2DVkGL    m_rtOutputGL;
-  vk::CommandPool           m_rtCmdPool;
-  vk::CommandBuffer         m_rtCmdBuffer;  // CmdBuf use for ray tracing
-  vk::Queue                 m_rtQueue;
-  nvvk::Buffer           m_rtSBTBuffer;
+  nvvk::Buffer              m_rtSBTBuffer;
   nvvk::RaytracingBuilderNV m_rtBuilder;
-  vk::DescriptorPool        m_rtDescPool;
-  vk::DescriptorSetLayout   m_rtDescSetLayout;
-  vk::DescriptorSet         m_rtDescSet;
-  vk::PipelineLayout        m_rtPipelineLayout;
-  vk::Pipeline              m_rtPipeline;
+  VkCommandPool             m_rtCmdPool        = VK_NULL_HANDLE;
+  VkCommandBuffer           m_rtCmdBuffer      = VK_NULL_HANDLE;  // CmdBuf use for ray tracing
+  VkQueue                   m_rtQueue          = VK_NULL_HANDLE;
+  VkDescriptorPool          m_rtDescPool       = VK_NULL_HANDLE;
+  VkDescriptorSetLayout     m_rtDescSetLayout  = VK_NULL_HANDLE;
+  VkDescriptorSet           m_rtDescSet        = VK_NULL_HANDLE;
+  VkPipelineLayout          m_rtPipelineLayout = VK_NULL_HANDLE;
+  VkPipeline                m_rtPipeline       = VK_NULL_HANDLE;
 
   // Properties
-  vk::PhysicalDeviceRayTracingPropertiesNV m_rtProperties;
+  VkPhysicalDeviceRayTracingPropertiesNV m_rtProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV};
 };
 }  // namespace interop

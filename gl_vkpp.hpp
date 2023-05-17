@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.h>
 
 #ifdef WIN32
 #include <handleapi.h>
@@ -35,7 +35,7 @@
 
 #include "utility_ogl.hpp"
 #include "nvvk/stagingmemorymanager_vk.hpp"
- 
+
 
 //--------------------------------------------------------------------------------------------------
 // This holds the buffer and texture Vulkan-OpenGL variation
@@ -57,14 +57,14 @@ public:
   {
     init(device, physicalDevice, stagingBlockSize);
   }
-  ~ResourceAllocatorGLInterop() { deinit(); }
+  ~ResourceAllocatorGLInterop() override { deinit(); }
 
   void init(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE)
   {
     m_dmaGL = std::make_unique<nvvk::DeviceMemoryAllocatorGL>(device, physicalDevice);
     nvvk::ExportResourceAllocator::init(device, physicalDevice, m_dmaGL.get(), stagingBlockSize);
 
-    // The staging will only use DMA, without export functionality. 
+    // The staging will only use DMA, without export functionality.
     m_dma = std::make_unique<nvvk::DeviceMemoryAllocator>(device, physicalDevice);
     m_staging = std::make_unique<nvvk::StagingMemoryManager>(dynamic_cast<nvvk::MemAllocator*>(m_dma.get()), stagingBlockSize);
   }
@@ -84,7 +84,7 @@ public:
 
 protected:
   std::unique_ptr<nvvk::DeviceMemoryAllocatorGL> m_dmaGL;
-  std::unique_ptr<nvvk::DeviceMemoryAllocator> m_dma;
+  std::unique_ptr<nvvk::DeviceMemoryAllocator>   m_dma;
 };
 
 
@@ -107,9 +107,9 @@ struct Texture2DVkGL
 {
   nvvk::Texture texVk;
 
-  GLuint       oglId{0};  // Extra: OpenGL object ID
-  uint32_t     mipLevels{1};
-  vk::Extent2D imgSize{0, 0};
+  GLuint     oglId{0};  // Extra: OpenGL object ID
+  uint32_t   mipLevels{1};
+  VkExtent2D imgSize{0, 0};
 
   void destroy(nvvk::ResourceAllocator& alloc)
   {
@@ -121,20 +121,21 @@ struct Texture2DVkGL
 // Get the Vulkan buffer and create the OpenGL equivalent using the memory allocated in Vulkan
 inline void createBufferGL(BufferVkGL& bufGl, ResourceAllocatorGLInterop& memAllocGL)
 {
-  nvvk::AllocationGL allocGL = memAllocGL.getAllocationGL(bufGl.bufVk.memHandle);
+  const nvvk::AllocationGL allocGL = memAllocGL.getAllocationGL(bufGl.bufVk.memHandle);
 
   glCreateBuffers(1, &bufGl.oglId);
-  glNamedBufferStorageMemEXT(bufGl.oglId, allocGL.size, allocGL.memoryObject, allocGL.offset);
+  glNamedBufferStorageMemEXT(bufGl.oglId, static_cast<GLsizeiptr>(allocGL.size), allocGL.memoryObject, allocGL.offset);
 }
 
 // Get the Vulkan texture and create the OpenGL equivalent using the memory allocated in Vulkan
 inline void createTextureGL(Texture2DVkGL& texGl, int format, int minFilter, int magFilter, int wrap, ResourceAllocatorGLInterop& memAllocGL)
 {
-  auto allocGL = memAllocGL.getAllocationGL(texGl.texVk.memHandle);
+  const nvvk::AllocationGL allocGL = memAllocGL.getAllocationGL(texGl.texVk.memHandle);
 
   // Create a 'memory object' in OpenGL, and associate it with the memory allocated in Vulkan
   glCreateTextures(GL_TEXTURE_2D, 1, &texGl.oglId);
-  glTextureStorageMem2DEXT(texGl.oglId, texGl.mipLevels, format, texGl.imgSize.width, texGl.imgSize.height,
+  glTextureStorageMem2DEXT(texGl.oglId, static_cast<GLsizei>(texGl.mipLevels), format,
+                           static_cast<GLsizei>(texGl.imgSize.width), static_cast<GLsizei>(texGl.imgSize.height),
                            allocGL.memoryObject, allocGL.offset);
   glTextureParameteri(texGl.oglId, GL_TEXTURE_MIN_FILTER, minFilter);
   glTextureParameteri(texGl.oglId, GL_TEXTURE_MAG_FILTER, magFilter);
