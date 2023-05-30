@@ -33,6 +33,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "backends/imgui_impl_glfw.h"
 #include "nvgl/contextwindow_gl.hpp"
 #include "nvvk/context_vk.hpp"
