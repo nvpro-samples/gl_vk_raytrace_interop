@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
  * SPDX-FileCopyrightText: Copyright (c) 2019-2021 NVIDIA CORPORATION
  * SPDX-License-Identifier: Apache-2.0
  */
-
 
 
 //--------------------------------------------------------------------------------------------------
@@ -36,6 +35,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "backends/imgui_impl_glfw.h"
 #include "nvgl/contextwindow_gl.hpp"
+#include "nvp/nvpsystem.hpp"
 #include "nvvk/context_vk.hpp"
 #include "vkglexample.h"
 
