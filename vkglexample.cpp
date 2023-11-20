@@ -30,10 +30,12 @@
 #include "vkglexample.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
-#include "imgui_helper.h"
+#include "imgui/imgui_helper.h"
 #include "nvh/fileoperations.hpp"
 #include <random>  // Used to randomly place objects
 #include <stb_image.h>
+
+#include <glm/gtc/type_ptr.hpp>
 
 constexpr auto NB_MAX_TETRAHEDRONS = 10000;
 constexpr auto UBO_MATRIX          = 0;
@@ -144,20 +146,20 @@ void VkGlExample::createScene()
   m_meshes.push_back(createFacetedTetrahedron());
   for(int n = 0; n < NB_MAX_TETRAHEDRONS; ++n)
   {
-    inst.objectIndex  = static_cast<uint32_t>(m_meshes.size() - 1);
-    const float scale = disn(gen);
-    inst.transform.as_translation(nvmath::vec3f(dis(gen), dis(gen), dis(gen)));
-    inst.transform.rotate(dis(gen), nvmath::vec3f(1.0F, 0.0F, 0.0F));
-    inst.transform.scale(nvmath::vec3f(scale, scale, scale));
+    inst.objectIndex   = static_cast<uint32_t>(m_meshes.size() - 1);
+    const float scale  = disn(gen);
+    inst.transform     = glm::translate(glm::mat4(1), glm::vec3(dis(gen), dis(gen), dis(gen)));
+    inst.transform     = glm::rotate(inst.transform, dis(gen), glm::vec3(1.0F, 0.0F, 0.0F));
+    inst.transform     = glm::scale(inst.transform, glm::vec3(scale, scale, scale));
     inst.materialIndex = n % 2;  // Alternating the material color
     m_instances.push_back(inst);
   }
 
   // Adding the plane
   m_meshes.push_back(createPlane());
-  inst             = {};
-  inst.objectIndex = static_cast<uint32_t>(m_meshes.size() - 1);
-  inst.transform.as_translation(nvmath::vec3f(0.F, -5.F, 0.F));
+  inst               = {};
+  inst.objectIndex   = static_cast<uint32_t>(m_meshes.size() - 1);
+  inst.transform     = glm::translate(glm::mat4(1), glm::vec3(0.F, -5.F, 0.F));
   inst.materialIndex = 2;
   m_instances.push_back(inst);
 }
@@ -171,14 +173,14 @@ VkGlExample::Meshes VkGlExample::createFacetedTetrahedron()
   std::vector<uint32_t> indices;
 
   // Position and indices of the tetrahedron
-  std::vector<nvmath::vec3f> tpos(4);
-  tpos[0]                    = nvmath::vec3f(sqrt(8.F / 9.F), 0, -1.F / 3.F);
-  tpos[1]                    = nvmath::vec3f(-sqrt(2.F / 9.F), sqrt(2.F / 3.F), -1.F / 3.F);
-  tpos[2]                    = nvmath::vec3f(-sqrt(2.F / 9.F), -sqrt(2.F / 3.F), -1.F / 3.F);
-  tpos[3]                    = nvmath::vec3f(0, 0, 1);
+  std::vector<glm::vec3> tpos(4);
+  tpos[0]                    = glm::vec3(sqrt(8.F / 9.F), 0, -1.F / 3.F);
+  tpos[1]                    = glm::vec3(-sqrt(2.F / 9.F), sqrt(2.F / 3.F), -1.F / 3.F);
+  tpos[2]                    = glm::vec3(-sqrt(2.F / 9.F), -sqrt(2.F / 3.F), -1.F / 3.F);
+  tpos[3]                    = glm::vec3(0, 0, 1);
   std::vector<uint32_t> tidx = {0, 2, 1, /*0*/ 0, 1, 3, /*1*/ 0, 3, 2, /*2*/ 1, 2, 3 /*3*/};
 
-  std::vector<nvmath::vec2f> tuv = {{0, 0}, {1, 0}, {0.5F, 1}};
+  std::vector<glm::vec2> tuv = {{0, 0}, {1, 0}, {0.5F, 1}};
 
   vert.resize(4ULL * 3);     // 4 triangles
   indices.resize(4ULL * 3);  // 12 indices
@@ -187,10 +189,10 @@ VkGlExample::Meshes VkGlExample::createFacetedTetrahedron()
   uint32_t vidx = 0;
   for(size_t t = 0; t < 4; ++t)
   {
-    const nvmath::vec3f& v0  = tpos[tidx[t * 3 + 0]];
-    const nvmath::vec3f& v1  = tpos[tidx[t * 3 + 1]];
-    const nvmath::vec3f& v2  = tpos[tidx[t * 3 + 2]];
-    const nvmath::vec3f  nrm = nvmath::normalize(nvmath::cross(v1 - v0, v2 - v0));
+    const glm::vec3& v0  = tpos[tidx[t * 3 + 0]];
+    const glm::vec3& v1  = tpos[tidx[t * 3 + 1]];
+    const glm::vec3& v2  = tpos[tidx[t * 3 + 2]];
+    const glm::vec3  nrm = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
     for(size_t v = 0; v < 3; ++v)
     {
@@ -233,16 +235,16 @@ VkGlExample::Meshes VkGlExample::createPlane()
 #define PLANE_SIZE 10
   // Position and indices of the tetrahedron
   vert.resize(4);
-  vert[0].pos = nvmath::vec3f(-PLANE_SIZE, 0, -PLANE_SIZE);
-  vert[1].pos = nvmath::vec3f(-PLANE_SIZE, 0, PLANE_SIZE);
-  vert[2].pos = nvmath::vec3f(PLANE_SIZE, 0, PLANE_SIZE);
-  vert[3].pos = nvmath::vec3f(PLANE_SIZE, 0, -PLANE_SIZE);
+  vert[0].pos = glm::vec3(-PLANE_SIZE, 0, -PLANE_SIZE);
+  vert[1].pos = glm::vec3(-PLANE_SIZE, 0, PLANE_SIZE);
+  vert[2].pos = glm::vec3(PLANE_SIZE, 0, PLANE_SIZE);
+  vert[3].pos = glm::vec3(PLANE_SIZE, 0, -PLANE_SIZE);
 
   indices.resize(6);
   indices = {0, 1, 2, /*0*/ 0, 2, 3 /*1*/};
 
   // Same normal for all vertices
-  const nvmath::vec3f nrm = {0.0F, 1.0F, 0.0F};
+  const glm::vec3 nrm = {0.0F, 1.0F, 0.0F};
   for(auto& v : vert)
   {
     v.nrm = nrm;
@@ -323,7 +325,7 @@ VkGeometryNV VkGlExample::meshToGeometry(const Meshes& mesh)
 void VkGlExample::prepareUniformBuffers()
 {
   // Adding all matrices in a single buffer.
-  std::vector<nvmath::mat4f> allMatrices;
+  std::vector<glm::mat4> allMatrices;
   allMatrices.reserve(m_instances.size());
   for(auto& inst : m_instances)
   {
@@ -332,8 +334,7 @@ void VkGlExample::prepareUniformBuffers()
 
   {
     const nvvk::ScopeCommandBuffer cmd(m_device, m_graphicsQueueIndex);
-    m_uniformBuffers.matrices.bufVk =
-        m_allocInterop.createBuffer<nvmath::mat4f>(cmd, allMatrices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    m_uniformBuffers.matrices.bufVk = m_allocInterop.createBuffer<glm::mat4>(cmd, allMatrices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     createBufferGL(m_uniformBuffers.matrices, m_allocInterop);
   }
   m_allocInterop.finalizeAndReleaseStaging();
@@ -355,10 +356,10 @@ void VkGlExample::onWindowRefresh()
 
   // Set the camera matrix for the raster
   m_shaderRaster.use();
-  const float         aspectRatio = static_cast<float>(m_size.width) / static_cast<float>(m_size.height);
-  const nvmath::mat4f modelView   = CameraManip.getMatrix();  // Retrieving the camera matrix
-  const nvmath::mat4f proj        = nvmath::perspective(CameraManip.getFov(), aspectRatio, 0.001F, 1000.0F);
-  const nvmath::mat4f matrix      = proj * modelView;
+  const float     aspectRatio = static_cast<float>(m_size.width) / static_cast<float>(m_size.height);
+  const glm::mat4 modelView   = glm::mat4(CameraManip.getMatrix());  // Retrieving the camera matrix
+  glm::mat4       proj        = glm::perspectiveRH_NO(glm::radians(CameraManip.getFov()), aspectRatio, 0.001F, 1000.0F);
+  const glm::mat4 matrix      = proj * modelView;
   m_shaderRaster.setMat4("u_ViewProjectionMatrix", matrix);
 
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, UBO_MATRIX, 0);  // Bind the buffer containing all instance matrices
@@ -373,7 +374,7 @@ void VkGlExample::onWindowRefresh()
 
     // Offset for the instance matrix
     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, UBO_MATRIX, m_uniformBuffers.matrices.oglId,  //
-                      static_cast<GLintptr>(sizeof(nvmath::mat4f) * i), sizeof(nvmath::mat4f));
+                      static_cast<GLintptr>(sizeof(glm::mat4) * i), sizeof(glm::mat4));
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_meshes[0].indexCount), GL_UNSIGNED_INT, nullptr);
   }
 
@@ -384,7 +385,7 @@ void VkGlExample::onWindowRefresh()
   m_shaderRaster.setBool("u_hasTexture", false);
   m_shaderRaster.setVec3("u_color", .7f, .7f, .7f);
   glBindBufferRange(GL_SHADER_STORAGE_BUFFER, UBO_MATRIX, m_uniformBuffers.matrices.oglId,  //
-                    static_cast<GLintptr>(sizeof(nvmath::mat4f) * planeInstanceIndex), sizeof(nvmath::mat4f));
+                    static_cast<GLintptr>(sizeof(glm::mat4) * planeInstanceIndex), sizeof(glm::mat4));
   glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_meshes[planeIndex].indexCount), GL_UNSIGNED_INT, nullptr);
 
   // Done rendering in FBO
@@ -430,13 +431,13 @@ void VkGlExample::onWindowRefresh()
 //
 bool VkGlExample::needToResetFrame()
 {
-  static nvmath::mat4f refCamMatrix;
+  static glm::mat4 refCamMatrix;
 
   for(int32_t i = 0; i < 16; i++)
   {
-    if(CameraManip.getMatrix().mat_array[i] != refCamMatrix.mat_array[i])
+    if(CameraManip.getMatrix() != refCamMatrix)
     {
-      refCamMatrix = CameraManip.getMatrix();
+      refCamMatrix = glm::mat4(CameraManip.getMatrix());
       return true;
     }
   }
@@ -675,12 +676,12 @@ void VkGlExample::onKeyboardChar(unsigned char key)
   {
     double x{0.0}, y{0.0};
     glfwGetCursorPos(m_window, &x, &y);
-    nvmath::vec4f pixelf;
+    glm::vec4 pixelf;
     glGetTextureSubImage(m_gBufferColor[0].oglId, 0, static_cast<GLint>(x), static_cast<GLint>(m_size.height - y), 0, 1,
-                         1, 1, GL_RGBA, GL_FLOAT, sizeof(nvmath::vec4f), &pixelf);
-    nvmath::vec3f eye, ctr, up;
+                         1, 1, GL_RGBA, GL_FLOAT, sizeof(glm::vec4), &pixelf);
+    glm::vec3 eye, ctr, up;
     CameraManip.getLookat(eye, ctr, up);
-    CameraManip.setLookat(eye, nvmath::vec3f(pixelf), up, false);
+    CameraManip.setLookat(eye, glm::vec3(pixelf), up, false);
   }
 
   // Frame the BBOX

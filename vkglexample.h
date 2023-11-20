@@ -17,7 +17,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "backends/imgui_impl_gl.h"
+#include "imgui/backends/imgui_impl_gl.h"
 #include "nvgl/extensions_gl.hpp"
 #include "nvvkhl/appbase_vk.hpp"
 #include "raytrace_interop.hpp"
@@ -47,9 +47,9 @@ private:
   // Structure of the Vertices used by the shaders
   struct Vertex
   {
-    nvmath::vec3f pos;
-    nvmath::vec3f nrm;
-    nvmath::vec2f uv;
+    glm::vec3 pos;
+    glm::vec3 nrm;
+    glm::vec2 uv;
   };
 
   // Simple triangle mesh structure
@@ -73,7 +73,7 @@ private:
   {
     uint32_t      objectIndex{0};               // Reference of the mesh
     uint32_t      materialIndex{0};             // Reference of the material
-    nvmath::mat4f transform{nvmath::mat4f(1)};  // identity
+    glm::mat4 transform{glm::mat4(1)};  // identity
   };
 
 
